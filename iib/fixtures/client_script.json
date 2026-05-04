@@ -1,0 +1,13 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "User",
+  "enabled": 1,
+  "modified": "2026-05-04 15:42:57.136964",
+  "module": "IIB",
+  "name": "User UI Simplification",
+  "script": "frappe.ui.form.on('User', {\n    refresh: function(frm) {\n        setTimeout(function() {\n            hide_roles();\n            filter_modules();\n            hide_bulk_buttons();\n        }, 700);\n    }\n});\n\nfunction hide_roles() {\n    const blacklist = ['System Manager', 'Script Manager'];\n\n    blacklist.forEach(function(role) {\n        $(`[data-fieldname=\"roles_html\"] input[data-unit=\"${role}\"]`)\n            .closest('div.unit-checkbox')\n            .hide();\n    });\n}\n\nfunction filter_modules() {\n    const whitelist = [\n        'Accounts',\n        'Buying',\n        'Manufacturing',\n        'Selling',\n        'Stock',\n        'Quality Management'\n    ];\n\n    $('[data-fieldname=\"modules_html\"] div.unit-checkbox').each(function() {\n        const unit = $(this).find('input').data('unit');\n        if (!whitelist.includes(unit)) {\n            $(this).hide();\n        }\n    });\n}\n\nfunction hide_bulk_buttons() {\n    $('div.bulk-select-options').hide();\n}",
+  "view": "Form"
+ }
+]
