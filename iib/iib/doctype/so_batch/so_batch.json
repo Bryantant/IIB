@@ -92,6 +92,7 @@
    "label": "Round Total"
   },
   {
+   "default": "Stores - IIB",
    "fieldname": "default_warehouse",
    "fieldtype": "Link",
    "label": "Default Warehouse",
