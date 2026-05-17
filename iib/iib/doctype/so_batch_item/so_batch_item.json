@@ -11,9 +11,9 @@
   "set_or_pcs",
   "part_no",
   "qty",
+  "rate",
   "line_no",
   "remark",
-  "rate",
   "resolved_item_code",
   "resolved_set_item_code"
  ],
@@ -56,6 +56,12 @@
    "reqd": 1
   },
   {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Rate"
+  },
+  {
    "fieldname": "line_no",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -66,12 +72,6 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Remark"
-  },
-  {
-   "fieldname": "rate",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
-   "label": "Rate"
   },
   {
    "fieldname": "resolved_item_code",
