@@ -63,7 +63,7 @@
   },
   {
    "fieldname": "remark",
-   "fieldtype": "Small Text",
+   "fieldtype": "Data",
    "label": "Remark"
   },
   {
