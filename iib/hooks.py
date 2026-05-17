@@ -28,7 +28,7 @@ app_license = "mit"
 # app_include_css = "/assets/iib/css/iib.css"
 app_include_css = ["/assets/iib/css/custom.css"]
 web_include_css = ["/assets/iib/css/custom.css"]
-# app_include_js = "/assets/iib/js/iib.js"
+app_include_js = ["/assets/iib/js/desk_overrides.js"]
 
 # include js, css files in header of web template
 # web_include_js = "/assets/iib/js/iib.js"
@@ -130,21 +130,32 @@ web_include_css = ["/assets/iib/css/custom.css"]
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"BOM Creator": "iib.overrides.bom_creator.BOMCreatorExtended",
+	"Production Plan": "iib.overrides.production_plan.ProductionPlanExtended",
+}
 
 # Document Events
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Work Order": {
+		"on_update": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_work_order",
+		"on_update_after_submit": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_work_order",
+		"on_cancel": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_work_order",
+	},
+	"Material Request": {
+		"on_update": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_material_request",
+		"on_submit": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_material_request",
+		"on_cancel": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_material_request",
+	},
+	"Purchase Order": {
+		"on_update": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
+		"on_submit": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
+		"on_cancel": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
@@ -178,6 +189,9 @@ web_include_css = ["/assets/iib/css/custom.css"]
 # override_whitelisted_methods = {
 # 	"frappe.desk.doctype.event.event.get_events": "iib.event.get_events"
 # }
+override_whitelisted_methods = {
+	"erpnext.manufacturing.doctype.bom_creator.bom_creator.add_sub_assembly": "iib.overrides.bom_creator.add_sub_assembly"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -255,6 +269,6 @@ fixtures = [
     {"dt": "Custom Field", "filters": [["module", "=", "IIB"]]},
     {"dt": "Client Script", "filters": [["module", "=", "IIB"]]},
     {"dt": "Server Script", "filters": [["module", "=", "IIB"]]},
+    {"dt": "Item Group", "filters": [["module", "=", "IIB"]]},
     "Custom DocPerm",
 ]
-

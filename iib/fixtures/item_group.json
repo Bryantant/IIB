@@ -1,0 +1,26 @@
+[
+ {
+  "doctype": "Item Group",
+  "is_group": 0,
+  "item_group_name": "Master Card",
+  "module": "IIB",
+  "name": "Master Card",
+  "parent_item_group": "All Item Groups"
+ },
+ {
+  "doctype": "Item Group",
+  "is_group": 0,
+  "item_group_name": "Sub Assemblies",
+  "module": "IIB",
+  "name": "Sub Assemblies",
+  "parent_item_group": "All Item Groups"
+ },
+ {
+  "doctype": "Item Group",
+  "is_group": 0,
+  "item_group_name": "Component",
+  "module": "IIB",
+  "name": "Component",
+  "parent_item_group": "All Item Groups"
+ }
+]
