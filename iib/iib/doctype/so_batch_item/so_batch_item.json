@@ -64,6 +64,7 @@
   {
    "fieldname": "remark",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Remark"
   },
   {
