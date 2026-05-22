@@ -13,8 +13,6 @@
   "currency",
   "conversion_rate",
   "payment_terms_template",
-  "is_price_idr",
-  "round_total",
   "default_warehouse",
   "section_break_items",
   "so_batch_items",
@@ -78,18 +76,6 @@
    "label": "Payment Terms Template",
    "options": "Payment Terms Template",
    "reqd": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "is_price_idr",
-   "fieldtype": "Check",
-   "label": "Is Price IDR"
-  },
-  {
-   "default": "0",
-   "fieldname": "round_total",
-   "fieldtype": "Check",
-   "label": "Round Total"
   },
   {
    "default": "Stores - IIB",

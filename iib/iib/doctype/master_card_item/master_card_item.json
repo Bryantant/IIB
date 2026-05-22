@@ -1,0 +1,225 @@
+{
+ "actions": [],
+ "creation": "2026-05-18 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "component",
+  "item_code",
+  "item_description",
+  "custom_part_no",
+  "custom_printing",
+  "custom_colour_1",
+  "custom_colour_2",
+  "custom_colour_3",
+  "custom_colour_4",
+  "custom_colour_5",
+  "custom_inside_measure_l",
+  "custom_inside_measure_w",
+  "custom_inside_measure_h",
+  "custom_width",
+  "custom_length",
+  "custom_dc",
+  "custom_board_quality",
+  "custom_flute",
+  "custom_remarks",
+  "custom_weight",
+  "qty",
+  "uom",
+  "item_name"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "component",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Comp",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item",
+   "read_only": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "item_description",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Description",
+   "options": "Item Description",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "custom_part_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Part No",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "custom_printing",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Printing"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_colour_1",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Colour 1",
+   "options": "Colour 1"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_colour_2",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Colour 2",
+   "options": "Colour 2"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_colour_3",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Colour 3",
+   "options": "Colour 3"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_colour_4",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Colour 4",
+   "options": "Colour 4"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_colour_5",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Colour 5",
+   "options": "Colour 5"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_inside_measure_l",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "IS.L"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_inside_measure_w",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "IS.W"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_inside_measure_h",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "IS.H"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_width",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Width"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_length",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Length"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_dc",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "D/C"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_board_quality",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Board Quality",
+   "options": "Board Quality"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_flute",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Flute",
+   "options": "Flute"
+  },
+  {
+   "columns": 2,
+   "fieldname": "custom_remarks",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Remarks"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_weight",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Weight"
+  },
+  {
+   "columns": 1,
+   "default": "1",
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "UOM",
+   "options": "UOM",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Item Name",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-20 14:12:05.281816",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "Master Card Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

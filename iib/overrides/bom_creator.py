@@ -254,11 +254,11 @@ def create_master_card_bom_creator(customer, item_name):
 	if not item_name:
 		frappe.throw(_("Item Name is required."))
 
-	settings = frappe.get_single("IIB Naming Settings")
+	settings = frappe.get_single("IIB Settings")
 	next_number = settings.master_card_next_number
 
 	if not next_number or next_number < 1:
-		frappe.throw(_("Set Master Card Next Number in IIB Naming Settings."))
+		frappe.throw(_("Set Master Card Next Number in IIB Settings."))
 
 	frappe.db.sql("select value from `tabSingles` where doctype=%s for update", (settings.doctype,))
 
@@ -267,7 +267,7 @@ def create_master_card_bom_creator(customer, item_name):
 		item_number += 1
 
 	item_code = str(item_number)
-	frappe.db.set_single_value("IIB Naming Settings", "master_card_next_number", item_number + 1)
+	frappe.db.set_single_value("IIB Settings", "master_card_next_number", item_number + 1)
 
 	try:
 		item_doc = frappe.get_doc(
@@ -296,7 +296,7 @@ def create_master_card_bom_creator(customer, item_name):
 		)
 		bom_creator.insert(ignore_permissions=True)
 	except Exception:
-		frappe.db.set_single_value("IIB Naming Settings", "master_card_next_number", next_number)
+		frappe.db.set_single_value("IIB Settings", "master_card_next_number", next_number)
 		raise
 
 	return {"item": item_doc.name, "bom_creator": bom_creator.name}

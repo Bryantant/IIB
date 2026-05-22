@@ -9,3 +9,6 @@ iib.patches.v0_0.add_custom_production_plan_links
 iib.patches.v0_0.add_bom_creator_branch_fields
 iib.patches.v0_0.initialize_iib_naming_settings
 iib.patches.v0_0.add_production_plan_rm_override
+iib.patches.v0_0.merge_iib_naming_settings
+iib.patches.v0_0.remove_jop1_stock_entry_fields
+iib.patches.v0_0.add_jop2_stock_entry_field

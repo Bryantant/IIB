@@ -2,22 +2,162 @@
  "actions": [],
  "creation": "2026-05-16 00:00:00.000000",
  "doctype": "DocType",
+ "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "default_so_warehouse"
+  "master_card_next_number",
+  "section_bom_creator",
+  "fg_item_group",
+  "sub_assembly_item_group",
+  "column_break_1",
+  "component_item_group",
+  "default_uom",
+  "section_master_card",
+  "mc_bundle_item_group",
+  "mc_fg_item_group",
+  "section_so_batch",
+  "default_so_warehouse",
+  "section_job_order",
+  "default_expense_account",
+  "column_break_job_order",
+  "default_cost_center",
+  "section_production_plan_p2",
+  "default_raw_material_warehouse",
+  "default_wip_warehouse",
+  "column_break_ppp2",
+  "default_fg_warehouse"
  ],
  "fields": [
+  {
+   "fieldname": "master_card_next_number",
+   "fieldtype": "Int",
+   "label": "Master Card Next Number",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_bom_creator",
+   "fieldtype": "Section Break",
+   "label": "BOM Creator Defaults"
+  },
+  {
+   "default": "Master Card",
+   "fieldname": "fg_item_group",
+   "fieldtype": "Link",
+   "label": "FG Item Group",
+   "options": "Item Group"
+  },
+  {
+   "default": "Sub Assemblies",
+   "fieldname": "sub_assembly_item_group",
+   "fieldtype": "Link",
+   "label": "Sub-Assembly Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Component",
+   "fieldname": "component_item_group",
+   "fieldtype": "Link",
+   "label": "Component Item Group",
+   "options": "Item Group"
+  },
+  {
+   "default": "Nos",
+   "fieldname": "default_uom",
+   "fieldtype": "Link",
+   "label": "Default UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "section_master_card",
+   "fieldtype": "Section Break",
+   "label": "Master Card Defaults"
+  },
+  {
+   "default": "Master Card",
+   "fieldname": "mc_bundle_item_group",
+   "fieldtype": "Link",
+   "label": "Bundle Item Group",
+   "options": "Item Group"
+  },
+  {
+   "default": "Sub Assemblies",
+   "fieldname": "mc_fg_item_group",
+   "fieldtype": "Link",
+   "label": "FG Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "section_so_batch",
+   "fieldtype": "Section Break",
+   "label": "SO Batch Defaults"
+  },
   {
    "fieldname": "default_so_warehouse",
    "fieldtype": "Link",
    "label": "Default SO Warehouse",
    "options": "Warehouse"
+  },
+  {
+   "fieldname": "section_job_order",
+   "fieldtype": "Section Break",
+   "label": "Job Order Defaults"
+  },
+  {
+   "fieldname": "default_expense_account",
+   "fieldtype": "Link",
+   "label": "Default Expense Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_job_order",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_cost_center",
+   "fieldtype": "Link",
+   "label": "Default Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "section_production_plan_p2",
+   "fieldtype": "Section Break",
+   "label": "Production Plan P2 Defaults"
+  },
+  {
+   "fieldname": "default_raw_material_warehouse",
+   "fieldtype": "Link",
+   "label": "Raw Material Warehouse",
+   "options": "Warehouse",
+   "default": "Raw Material - IIB"
+  },
+  {
+   "fieldname": "default_wip_warehouse",
+   "fieldtype": "Link",
+   "label": "WIP Warehouse",
+   "options": "Warehouse",
+   "default": "Work In Progress - IIB"
+  },
+  {
+   "fieldname": "column_break_ppp2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_fg_warehouse",
+   "fieldtype": "Link",
+   "label": "FG Warehouse",
+   "options": "Warehouse",
+   "default": "Finished Goods - IIB"
   }
  ],
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-05-16 00:00:00.000000",
+ "modified": "2026-05-22 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "IIB Settings",
@@ -25,6 +165,7 @@
  "permissions": [
   {
    "create": 1,
+   "delete": 1,
    "email": 1,
    "print": 1,
    "read": 1,
@@ -33,6 +174,7 @@
    "write": 1
   }
  ],
- "sort_field": "creation",
- "sort_order": "DESC"
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
 }

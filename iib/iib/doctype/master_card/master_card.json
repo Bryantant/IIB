@@ -1,0 +1,181 @@
+{
+ "actions": [],
+ "autoname": "custom",
+ "creation": "2026-05-18 00:00:00",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "col_break_header",
+  "customer",
+  "description",
+  "disabled",
+  "company",
+  "currency",
+  "rm_cost_as_per",
+  "mc_bundle_item_group",
+  "mc_fg_item_group",
+  "component_item_group",
+  "default_uom",
+  "sec_items",
+  "copy_fg_html",
+  "items",
+  "sec_processes",
+  "process_tabs_html",
+  "processes"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "MC Number",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "col_break_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Description",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Company",
+   "options": "Company",
+   "remember_last_selected_value": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "default": "Valuation Rate",
+   "fieldname": "rm_cost_as_per",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Rate Of Materials Based On",
+   "options": "Valuation Rate\nLast Purchase Rate\nPrice List"
+  },
+  {
+   "fieldname": "mc_bundle_item_group",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Bundle Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "mc_fg_item_group",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "FG Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "component_item_group",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Component Item Group",
+   "options": "Item Group"
+  },
+  {
+   "default": "Nos",
+   "fieldname": "default_uom",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Default UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "sec_items",
+   "fieldtype": "Section Break",
+   "label": "Finish Goods"
+  },
+  {
+   "fieldname": "copy_fg_html",
+   "fieldtype": "HTML",
+   "label": "Copy FG Button"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Finish Goods",
+   "options": "Master Card Item"
+  },
+  {
+   "fieldname": "sec_processes",
+   "fieldtype": "Section Break",
+   "label": "Processes (Routing)"
+  },
+  {
+   "fieldname": "process_tabs_html",
+   "fieldtype": "HTML",
+   "label": "Process Component Tabs"
+  },
+  {
+   "fieldname": "processes",
+   "fieldtype": "Table",
+   "label": "Processes",
+   "options": "Master Card Process"
+  }
+ ],
+ "icon": "fa fa-sitemap",
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-05-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "Master Card",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Manufacturing Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Manufacturing User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

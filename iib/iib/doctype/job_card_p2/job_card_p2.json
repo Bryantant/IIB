@@ -1,0 +1,247 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-05-21 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "company",
+  "posting_date",
+  "job_order_p2",
+  "job_order_p2_operation",
+  "col_break_header",
+  "status",
+  "section",
+  "machine_no",
+  "production_item",
+  "master_card",
+  "sec_qty",
+  "for_quantity",
+  "total_completed_qty",
+  "col_break_qty",
+  "total_time_in_mins",
+  "operator",
+  "team",
+  "sec_time_logs",
+  "time_logs",
+  "sec_rejects",
+  "rejects",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "JCP2-.YY.-.#####",
+   "reqd": 1
+  },
+  {
+   "default": "PT Interpak Industries Batam",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "job_order_p2",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Job Order P2",
+   "options": "Job Order P2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "job_order_p2_operation",
+   "fieldtype": "Data",
+   "label": "Operation Row",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nWork In Progress\nOn Hold\nCompleted\nSubmitted\nCancelled",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Section",
+   "options": "IIB Production Section",
+   "reqd": 1
+  },
+  {
+   "fieldname": "machine_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Machine No.",
+   "reqd": 1
+  },
+  {
+   "fieldname": "production_item",
+   "fieldtype": "Link",
+   "label": "Production Item",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "master_card",
+   "fieldtype": "Link",
+   "label": "Master Card",
+   "options": "Master Card",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_qty",
+   "fieldtype": "Section Break",
+   "label": "Quantity & Operator"
+  },
+  {
+   "default": "0",
+   "fieldname": "for_quantity",
+   "fieldtype": "Float",
+   "label": "For Quantity",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "total_completed_qty",
+   "fieldtype": "Float",
+   "label": "Total Completed Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_time_in_mins",
+   "fieldtype": "Float",
+   "label": "Total Time (mins)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "operator",
+   "fieldtype": "Data",
+   "label": "Operator"
+  },
+  {
+   "fieldname": "team",
+   "fieldtype": "Data",
+   "label": "Team"
+  },
+  {
+   "fieldname": "sec_time_logs",
+   "fieldtype": "Section Break",
+   "label": "Time Logs"
+  },
+  {
+   "fieldname": "time_logs",
+   "fieldtype": "Table",
+   "label": "Time Logs",
+   "options": "Job Card P2 Time Log"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_rejects",
+   "fieldtype": "Section Break",
+   "label": "Rejects"
+  },
+  {
+   "fieldname": "rejects",
+   "fieldtype": "Table",
+   "label": "Rejects",
+   "options": "Job Card P2 Reject"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Job Card P2",
+   "print_hide": 1,
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-05-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "Job Card P2",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

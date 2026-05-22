@@ -44,7 +44,7 @@ app_include_js = ["/assets/iib/js/desk_overrides.js"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Sales Order": "public/js/sales_order_jo_p2.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -155,6 +155,10 @@ doc_events = {
 		"on_submit": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
 		"on_cancel": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
 	},
+	"Stock Entry": {
+		"on_submit": "iib.iib.doctype.job_order_p2.job_order_p2_hooks.on_stock_entry_change",
+		"on_cancel": "iib.iib.doctype.job_order_p2.job_order_p2_hooks.on_stock_entry_change",
+	},
 }
 
 # Scheduled Tasks
@@ -264,6 +268,8 @@ override_whitelisted_methods = {
 
 # Fixtures
 # --------
+company_data_to_be_ignored = ["Master Card"]
+
 fixtures = [
     {"dt": "Property Setter", "filters": [["module", "=", "IIB"]]},
     {"dt": "Custom Field", "filters": [["module", "=", "IIB"]]},

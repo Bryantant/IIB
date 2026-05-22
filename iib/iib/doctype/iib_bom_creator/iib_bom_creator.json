@@ -1,25 +1,25 @@
 {
  "actions": [],
- "autoname": "naming_series:",
+ "autoname": "custom",
  "creation": "2026-05-10 00:00:00.000000",
  "doctype": "DocType",
  "document_type": "Document",
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
-  "company",
-  "fg_item_group",
-  "sub_assembly_item_group",
-  "component_item_group",
-  "default_uom",
-  "col_break_1",
   "item_code",
-  "item_name",
-  "qty",
+  "col_break_header",
+  "customer",
+  "description",
+  "company",
   "currency",
   "rm_cost_as_per",
+  "fg_item_group",
+  "sub_assembly_item_group",
+  "default_uom",
   "sec_items",
   "items",
+  "sec_rm",
+  "rm_items",
   "sec_status",
   "status",
   "col_break_status",
@@ -28,77 +28,42 @@
  ],
  "fields": [
   {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Naming Series",
-   "options": "IIB-BOM-.YYYY.-",
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "MC Number"
+  },
+  {
+   "fieldname": "col_break_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Customer",
+   "options": "Customer",
    "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Description"
   },
   {
    "fieldname": "company",
    "fieldtype": "Link",
-   "in_list_view": 1,
+   "hidden": 1,
    "label": "Company",
    "options": "Company",
-   "reqd": 1,
-   "remember_last_selected_value": 1
-  },
-  {
-   "fieldname": "fg_item_group",
-   "fieldtype": "Link",
-   "label": "FG Item Group",
-   "options": "Item Group",
-   "reqd": 1
-  },
-  {
-   "fieldname": "sub_assembly_item_group",
-   "fieldtype": "Link",
-   "label": "Sub-Assembly Item Group",
-   "options": "Item Group",
-   "reqd": 1
-  },
-  {
-   "fieldname": "component_item_group",
-   "fieldtype": "Link",
-   "label": "Component Item Group",
-   "options": "Item Group",
-   "reqd": 1
-  },
-  {
-   "default": "Nos",
-   "fieldname": "default_uom",
-   "fieldtype": "Link",
-   "label": "Default UOM",
-   "options": "UOM",
-   "reqd": 1
-  },
-  {
-   "fieldname": "col_break_1",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "item_code",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "FG Item Code",
-   "read_only": 1
-  },
-  {
-   "fieldname": "item_name",
-   "fieldtype": "Data",
-   "label": "FG Item Name",
-   "read_only": 1
-  },
-  {
-   "default": "1",
-   "fieldname": "qty",
-   "fieldtype": "Float",
-   "label": "FG Quantity",
+   "remember_last_selected_value": 1,
    "reqd": 1
   },
   {
    "fieldname": "currency",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Currency",
    "options": "Currency",
    "reqd": 1
@@ -107,21 +72,56 @@
    "default": "Valuation Rate",
    "fieldname": "rm_cost_as_per",
    "fieldtype": "Select",
+   "hidden": 1,
    "label": "Rate Of Materials Based On",
    "options": "Valuation Rate\nLast Purchase Rate\nPrice List",
    "reqd": 1
   },
   {
+   "fieldname": "fg_item_group",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "FG Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "sub_assembly_item_group",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Sub-Assembly Item Group",
+   "options": "Item Group"
+  },
+  {
+   "default": "Nos",
+   "fieldname": "default_uom",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Default UOM",
+   "options": "UOM"
+  },
+  {
    "fieldname": "sec_items",
    "fieldtype": "Section Break",
-   "label": "Bill of Materials"
+   "label": "Sub-Assemblies"
   },
   {
    "fieldname": "items",
    "fieldtype": "Table",
-   "label": "Items",
-   "no_copy": 1,
+   "label": "Sub-Assemblies",
+   "no_copy": 0,
    "options": "IIB BOM Creator Item"
+  },
+  {
+   "fieldname": "sec_rm",
+   "fieldtype": "Section Break",
+   "label": "Raw Materials"
+  },
+  {
+   "fieldname": "rm_items",
+   "fieldtype": "Table",
+   "label": "Raw Materials",
+   "no_copy": 0,
+   "options": "IIB BOM Creator RM"
   },
   {
    "collapsible": 1,
@@ -167,11 +167,11 @@
    "link_fieldname": "bom_creator"
   }
  ],
- "modified": "2026-05-10 00:00:00.000000",
+ "modified": "2026-05-18 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "IIB BOM Creator",
- "naming_rule": "By \"Naming Series\" field",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {

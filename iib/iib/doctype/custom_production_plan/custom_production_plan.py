@@ -38,6 +38,10 @@ class CustomProductionPlan(Document):
 		self.set_status()
 		self._validate_items()
 
+	def before_submit(self):
+		if not self.items:
+			frappe.throw(_("Please add items before submitting. Use 'Get Items' to populate."))
+
 	def _validate_items(self):
 		for d in self.items:
 			if d.type in ("Finished Good", "Sub Assembly") and not d.bom_no:

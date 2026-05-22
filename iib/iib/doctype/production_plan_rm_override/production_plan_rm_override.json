@@ -13,10 +13,11 @@
  ],
  "fields": [
   {
+   "description": "Use Add Overrides to select one or more finished-good rows. Consolidated plans show the consolidated assembly row.",
    "fieldname": "production_plan_item",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Production Plan Item",
+   "label": "Assembly Item Row",
    "reqd": 1
   },
   {

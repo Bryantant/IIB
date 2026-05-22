@@ -4,6 +4,20 @@ from erpnext.manufacturing.doctype.production_plan.production_plan import Produc
 
 
 class ProductionPlanExtended(ProductionPlan):
+    def _rename_temporary_references(self):
+        super()._rename_temporary_references()
+
+        new_name_map = {d.temporary_name: d.name for d in self.po_items if d.temporary_name}
+        item_by_name = {d.name: d for d in self.po_items}
+
+        for row in self.get("custom_rm_overrides", []):
+            if row.production_plan_item in new_name_map:
+                row.production_plan_item = new_name_map[row.production_plan_item]
+
+            plan_item = item_by_name.get(row.production_plan_item)
+            if plan_item:
+                row.fg_item = plan_item.item_code
+
     def create_work_order(self, item):
         from erpnext.manufacturing.doctype.work_order.work_order import OverProductionError
 

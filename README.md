@@ -28,6 +28,10 @@ Pre-commit is configured to use the following tools for checking and formatting 
 - prettier
 - pyupgrade
 
+### Testing SOP
+
+Every ERP customization must be validated through Chrome before it is considered complete. See [SOP_CHROME_ERP_TESTING.md](SOP_CHROME_ERP_TESTING.md).
+
 ### License
 
 mit

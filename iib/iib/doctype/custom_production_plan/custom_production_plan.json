@@ -190,8 +190,7 @@
    "fieldtype": "Table",
    "label": "Items (FG / Sub Assembly / Raw Material)",
    "no_copy": 1,
-   "options": "Custom Production Plan Item",
-   "reqd": 1
+   "options": "Custom Production Plan Item"
   },
   {
    "collapsible": 1,

@@ -4,5 +4,5 @@
 from frappe.model.document import Document
 
 
-class IIBNamingSettings(Document):
+class JobOrderP1ReceiptItem(Document):
 	pass
