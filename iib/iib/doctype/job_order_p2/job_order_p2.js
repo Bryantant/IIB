@@ -324,7 +324,7 @@ function add_close_button(frm) {
 		__("Close"),
 		() => {
 			frappe.confirm(
-				__("Close this Job Order P2? No further Job Card edits will be allowed."),
+				__("Close this Job Order P2? No further changes will be allowed."),
 				() => set_status(frm, "Closed")
 			);
 		},

@@ -39,10 +39,7 @@ class MasterCard(Document):
 			("IIB Settings",),
 		)
 
-		# Skip numbers already used by either Master Card or IIB BOM Creator
-		while frappe.db.exists("Master Card", str(next_number)) or frappe.db.exists(
-			"IIB BOM Creator", str(next_number)
-		):
+		while frappe.db.exists("Master Card", str(next_number)):
 			next_number += 1
 
 		frappe.db.set_single_value(

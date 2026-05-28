@@ -4,19 +4,12 @@
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
-iib.patches.v0_0.create_bom_creator_sequence
-iib.patches.v0_0.add_custom_production_plan_links
-iib.patches.v0_0.add_bom_creator_branch_fields
 iib.patches.v0_0.initialize_iib_naming_settings
-iib.patches.v0_0.add_production_plan_rm_override
 iib.patches.v0_0.merge_iib_naming_settings
 iib.patches.v0_0.remove_jop1_stock_entry_fields
 iib.patches.v0_0.add_jop2_stock_entry_field
 iib.patches.v0_0.add_so_item_wip_quantity_field
 iib.patches.v0_0.add_packed_item_wip_quantity_field
 iib.patches.v0_0.convert_iib_production_section_to_tree
-iib.patches.v0_0.migrate_job_card_p2_section_group
-iib.patches.v0_0.migrate_job_order_p2_operation_production_section
 iib.patches.v0_0.reload_p2_stock_transfer_doctypes
 iib.patches.v0_0.recompute_jop2_wip_quantity_submitted_only
-iib.patches.v0_0.remove_dead_pp_and_dps_fields

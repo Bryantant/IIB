@@ -21,7 +21,6 @@
   "default_cost_center",
   "section_stock_entry_type",
   "jop2_start_stock_entry_type",
-  "section_production_plan_p2",
   "default_raw_material_warehouse",
   "default_wip_warehouse",
   "column_break_ppp2",
@@ -130,11 +129,6 @@
    "fieldtype": "Link",
    "label": "Return Components SE Type",
    "options": "Stock Entry Type"
-  },
-  {
-   "fieldname": "section_production_plan_p2",
-   "fieldtype": "Section Break",
-   "label": "Production Plan P2 Defaults"
   },
   {
    "default": "Raw Material - IIB",
