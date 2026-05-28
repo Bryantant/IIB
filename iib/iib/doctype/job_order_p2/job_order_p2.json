@@ -7,7 +7,6 @@
  "field_order": [
   "naming_series",
   "company",
-  "production_plan_p2",
   "ppp2_item_row",
   "production_item",
   "item_name",
@@ -35,7 +34,6 @@
   "wip_warehouse",
   "fg_warehouse",
   "sec_result",
-  "created_job_cards",
   "transfer_rm_doc",
   "amended_from"
  ],
@@ -55,14 +53,6 @@
    "label": "Company",
    "options": "Company",
    "reqd": 1
-  },
-  {
-   "fieldname": "production_plan_p2",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Production Plan P2",
-   "options": "Production Plan P2",
-   "read_only": 1
   },
   {
    "fieldname": "ppp2_item_row",
@@ -245,12 +235,6 @@
    "fieldname": "sec_result",
    "fieldtype": "Section Break",
    "label": "Result"
-  },
-  {
-   "fieldname": "created_job_cards",
-   "fieldtype": "Long Text",
-   "label": "Created Job Cards",
-   "read_only": 1
   },
   {
    "fieldname": "transfer_rm_doc",

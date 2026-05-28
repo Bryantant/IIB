@@ -77,7 +77,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Colour 1",
-   "options": "Colour 1"
+   "options": "Colour"
   },
   {
    "columns": 1,
@@ -85,7 +85,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Colour 2",
-   "options": "Colour 2"
+   "options": "Colour"
   },
   {
    "columns": 1,
@@ -93,7 +93,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Colour 3",
-   "options": "Colour 3"
+   "options": "Colour"
   },
   {
    "columns": 1,
@@ -101,7 +101,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Colour 4",
-   "options": "Colour 4"
+   "options": "Colour"
   },
   {
    "columns": 1,
@@ -109,7 +109,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Colour 5",
-   "options": "Colour 5"
+   "options": "Colour"
   },
   {
    "columns": 1,

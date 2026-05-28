@@ -299,24 +299,15 @@ class JobOrderP2(Document):
 
 	def on_submit(self):
 		self.db_set("status", "Not Started")
-		# NOTE: Job Card P2 retired — operations are now tracked via Production Process.
-		# create_job_cards() intentionally removed.
-		# custom_wip_quantity now counts submitted JOP2s only — sync after submit.
 		self.sync_current_so_item_wip_quantities()
 
 	def before_cancel(self):
-		self.guard_against_submitted_job_cards()
 		self.guard_against_submitted_movement_docs()
 
 	def on_cancel(self):
-		self.delete_draft_job_cards()
 		self.cancel_draft_rm_to_wip()
 		self.db_set("status", "Cancelled")
-		self.db_set("created_job_cards", "")
 		self.sync_current_so_item_wip_quantities(exclude_self=True)
-		if self.production_plan_p2:
-			plan = frappe.get_doc("Production Plan P2", self.production_plan_p2)
-			plan.recompute_produced_qty()
 
 	def on_trash(self):
 		self.sync_current_so_item_wip_quantities(exclude_self=True)
@@ -665,27 +656,6 @@ class JobOrderP2(Document):
 		)
 		return flt(qty)
 
-	# ---- Job Card auto-creation ----
-
-	def create_job_cards(self):
-		created = []
-		for op in self.operations:
-			jc = frappe.new_doc("Job Card P2")
-			jc.company = self.company
-			jc.posting_date = nowdate()
-			jc.job_order_p2 = self.name
-			jc.job_order_p2_operation = op.name
-			jc.production_item = self.production_item
-			jc.master_card = self.master_card
-			jc.section_group = op.section
-			jc.section = op.production_section
-			jc.for_quantity = self.qty
-			jc.status = "Open"
-			jc.insert(ignore_permissions=True)
-			created.append(jc.name)
-		if created:
-			self.db_set("created_job_cards", "\n".join(created))
-
 	# ---- RM to WIP doc creation (on submit) ----
 
 	def create_rm_to_wip_doc(self):
@@ -725,23 +695,6 @@ class JobOrderP2(Document):
 		self.db_set("transfer_rm_doc", doc.name)
 
 	# ---- cancel guards ----
-
-	def guard_against_submitted_job_cards(self):
-		submitted = frappe.db.sql(
-			"""
-			SELECT name FROM `tabJob Card P2`
-			WHERE job_order_p2 = %s AND docstatus = 1
-			""",
-			(self.name,),
-			as_dict=True,
-		)
-		if submitted:
-			names = [r.name for r in submitted]
-			frappe.throw(
-				_("Cannot cancel: submitted Job Card P2 exist: {0}. Cancel them first.").format(
-					", ".join(names)
-				)
-			)
 
 	def guard_against_submitted_movement_docs(self):
 		"""Block cancel if any submitted RM to WIP or WIP to FG docs exist."""
@@ -788,44 +741,6 @@ class JobOrderP2(Document):
 				)
 		except Exception:
 			pass
-
-	def delete_draft_job_cards(self):
-		drafts = frappe.db.sql(
-			"""
-			SELECT name FROM `tabJob Card P2`
-			WHERE job_order_p2 = %s AND docstatus = 0
-			""",
-			(self.name,),
-			as_dict=True,
-		)
-		for r in drafts:
-			frappe.delete_doc("Job Card P2", r.name, ignore_permissions=True, force=True)
-
-	# ---- Operation rollup (called from Job Card P2 submit/cancel) ----
-
-	def update_operation_completed_qty(self, operation_row_name):
-		"""Recompute completed_qty + status for one operation row from submitted Job Cards."""
-		total = frappe.db.sql(
-			"""
-			SELECT IFNULL(SUM(total_completed_qty), 0) AS qty
-			FROM `tabJob Card P2`
-			WHERE job_order_p2 = %s
-			  AND job_order_p2_operation = %s
-			  AND docstatus = 1
-			""",
-			(self.name, operation_row_name),
-		)[0][0]
-		for op in self.operations:
-			if op.name == operation_row_name:
-				op.db_set("completed_qty", flt(total), update_modified=False)
-				if flt(total) <= 0:
-					op.db_set("status", "Pending", update_modified=False)
-				elif flt(total) < flt(self.qty):
-					op.db_set("status", "In Progress", update_modified=False)
-				else:
-					op.db_set("status", "Completed", update_modified=False)
-				break
-		self._refresh_header_status()
 
 	def _refresh_header_status(self):
 		if self.docstatus != 1 or self.status in ("Cancelled", "Stopped", "Closed"):
@@ -900,9 +815,6 @@ class JobOrderP2(Document):
 		self.db_set("jo_qty_in_process", jo_qty_in_process, update_modified=False)
 		# Update status (may flip to Completed)
 		self.update_status()
-		if self.production_plan_p2:
-			plan = frappe.get_doc("Production Plan P2", self.production_plan_p2)
-			plan.recompute_produced_qty()
 
 
 # -----------------------------------------------------------------------------
