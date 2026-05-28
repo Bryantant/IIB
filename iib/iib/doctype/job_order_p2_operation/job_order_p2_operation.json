@@ -7,6 +7,7 @@
  "field_order": [
   "sequence",
   "section",
+  "production_section",
   "est_time_mins",
   "completed_qty",
   "status",
@@ -25,9 +26,17 @@
    "fieldname": "section",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Section",
+   "label": "Section Group",
    "options": "IIB Production Section",
    "reqd": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "production_section",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Production Section",
+   "options": "IIB Production Section",
    "columns": 3
   },
   {

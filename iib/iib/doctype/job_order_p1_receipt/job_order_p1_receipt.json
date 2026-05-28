@@ -57,6 +57,7 @@
    "label": "Edit Posting Date and Time"
   },
   {
+   "default": "Now",
    "depends_on": "eval:doc.set_posting_time",
    "fieldname": "posting_time",
    "fieldtype": "Time",
@@ -88,8 +89,7 @@
   {
    "fieldname": "notes",
    "fieldtype": "Small Text",
-   "label": "Notes",
-   "reqd": 1
+   "label": "Notes"
   },
   {
    "fieldname": "section_break_accounting",

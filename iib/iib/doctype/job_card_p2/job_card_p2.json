@@ -12,8 +12,8 @@
   "job_order_p2_operation",
   "col_break_header",
   "status",
+  "section_group",
   "section",
-  "machine_no",
   "production_item",
   "master_card",
   "sec_qty",
@@ -84,19 +84,20 @@
    "reqd": 1
   },
   {
+   "fieldname": "section_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Section Group",
+   "options": "IIB Production Section",
+   "read_only": 1
+  },
+  {
    "fieldname": "section",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Section",
+   "label": "Production Section",
    "options": "IIB Production Section",
-   "reqd": 1
-  },
-  {
-   "fieldname": "machine_no",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Machine No.",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "production_item",

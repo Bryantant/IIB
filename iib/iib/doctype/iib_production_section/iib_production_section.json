@@ -9,9 +9,14 @@
  "field_order": [
   "section_code",
   "section_name",
+  "parent_iib_production_section",
+  "is_group",
   "column_break_main",
   "disabled",
-  "description"
+  "description",
+  "lft",
+  "rgt",
+  "old_parent"
  ],
  "fields": [
   {
@@ -29,6 +34,21 @@
    "label": "Section Name"
   },
   {
+   "fieldname": "parent_iib_production_section",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "in_list_view": 1,
+   "label": "Parent Production Section",
+   "options": "IIB Production Section"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_group",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Group"
+  },
+  {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
   },
@@ -43,15 +63,46 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "fieldname": "lft",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Left",
+   "no_copy": 1,
+   "print_hide": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "rgt",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Right",
+   "no_copy": 1,
+   "print_hide": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "old_parent",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "ignore_user_permissions": 1,
+   "label": "Old Parent",
+   "no_copy": 1,
+   "options": "IIB Production Section",
+   "print_hide": 1,
+   "report_hide": 1
   }
  ],
  "index_web_pages_for_search": 1,
+ "is_tree": 1,
  "links": [],
  "modified": "2026-05-21 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "IIB Production Section",
  "naming_rule": "By fieldname",
+ "nsm_parent_field": "parent_iib_production_section",
  "owner": "Administrator",
  "permissions": [
   {
@@ -91,6 +142,7 @@
    "write": 0
   }
  ],
+ "search_fields": "parent_iib_production_section",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

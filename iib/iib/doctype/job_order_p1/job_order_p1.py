@@ -6,10 +6,15 @@ from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
 from frappe.utils import flt
 
+from iib.iib.utils.tolerance import lookup_tolerance
+
+
+JOP1_TARGET_WAREHOUSE = "Raw Material - IIB"
+
 
 class JobOrderP1(Document):
 	def validate(self):
-		self.set_department_marker()
+		self.set_defaults()
 		self.fetch_item_metadata()
 		self.validate_items()
 		self.compute_totals()
@@ -17,10 +22,11 @@ class JobOrderP1(Document):
 			self.status = "Draft"
 
 	def before_submit(self):
-		self.validate_no_double_booking()
+		self.validate_jop1_tolerance()
 
 	def on_submit(self):
 		self.db_set("status", "To Receive")
+		self.update_so_item_jop1_qty()
 
 	def before_cancel(self):
 		self.guard_against_submitted_receipts()
@@ -29,12 +35,14 @@ class JobOrderP1(Document):
 		self.delete_draft_receipts()
 		self.db_set("status", "Cancelled")
 		self.db_set("created_receipts", "")
+		self.update_so_item_jop1_qty()
 
 	# ---- validate helpers ----
 
-	def set_department_marker(self):
+	def set_defaults(self):
 		if not self.department:
 			self.department = "Production 1"
+		self.target_warehouse = JOP1_TARGET_WAREHOUSE
 
 	def fetch_item_metadata(self):
 		for row in self.items:
@@ -56,18 +64,27 @@ class JobOrderP1(Document):
 						row.idx, row.sales_order_item, row.sales_order
 					)
 				)
-			item_details = self.get_stock_item_details(so_item.item_code, row.idx)
-			self.validate_sales_order_stock_uom(
-				row, so_item.item_code, so_item.uom, item_details.stock_uom
-			)
-			row.item_code = so_item.item_code
-			row.item_name = so_item.item_name
-			row.description = so_item.description
-			row.uom = item_details.stock_uom
-			row.rate = so_item.rate
-			if not row.delivery_date:
-				row.delivery_date = so_item.delivery_date
-			row.customer = frappe.db.get_value("Sales Order", row.sales_order, "customer")
+			# Check if the SO item is a Product Bundle — packed items have already been
+			# expanded by get_so_items_for_jop1; preserve the row's item_code in that case.
+			is_bundle = frappe.db.exists("Product Bundle", so_item.item_code)
+			if is_bundle:
+				# Only fill delivery_date / customer; item fields come from the packed item
+				if not row.delivery_date:
+					row.delivery_date = so_item.delivery_date
+				row.customer = frappe.db.get_value("Sales Order", row.sales_order, "customer")
+			else:
+				item_details = self.get_stock_item_details(so_item.item_code, row.idx)
+				self.validate_sales_order_stock_uom(
+					row, so_item.item_code, so_item.uom, item_details.stock_uom
+				)
+				row.item_code = so_item.item_code
+				row.item_name = so_item.item_name
+				row.description = so_item.description
+				row.uom = item_details.stock_uom
+				row.rate = so_item.rate
+				if not row.delivery_date:
+					row.delivery_date = so_item.delivery_date
+				row.customer = frappe.db.get_value("Sales Order", row.sales_order, "customer")
 
 	def get_stock_item_details(self, item_code, row_idx):
 		item_details = frappe.db.get_value(
@@ -124,9 +141,9 @@ class JobOrderP1(Document):
 		for row in self.items:
 			if flt(row.qty) <= 0:
 				frappe.throw(_("Row {0}: Qty must be positive").format(row.idx))
-			key = (row.sales_order, row.sales_order_item)
+			key = (row.sales_order, row.sales_order_item, row.item_code)
 			if key in seen:
-				frappe.throw(_("Row {0}: Duplicate Sales Order line {1}").format(row.idx, row.sales_order_item))
+				frappe.throw(_("Row {0}: Duplicate item {1} for Sales Order line {2}").format(row.idx, row.item_code, row.sales_order_item))
 			seen.add(key)
 			if row.item_code:
 				item_details = self.get_stock_item_details(row.item_code, row.idx)
@@ -146,30 +163,6 @@ class JobOrderP1(Document):
 			row.pending_qty = max(flt(row.qty) - flt(row.received_qty), 0)
 
 	# ---- submit / cancel guards ----
-
-	def validate_no_double_booking(self):
-		so_item_names = [r.sales_order_item for r in self.items if r.sales_order_item]
-		if not so_item_names:
-			return
-
-		clashes = frappe.db.sql(
-			"""
-			SELECT i.parent, i.sales_order_item
-			FROM `tabJob Order P1 Item` i
-			JOIN `tabJob Order P1` p ON p.name = i.parent
-			WHERE i.sales_order_item IN %(items)s
-			  AND p.name != %(self)s
-			  AND p.docstatus = 1
-			  AND p.status NOT IN ('Completed', 'Closed', 'Cancelled')
-			""",
-			{"items": tuple(so_item_names), "self": self.name or ""},
-			as_dict=True,
-		)
-		if clashes:
-			parents = sorted({c.parent for c in clashes})
-			frappe.throw(
-				_("Sales Order line already on open Job Order P1: {0}").format(", ".join(parents))
-			)
 
 	def guard_against_submitted_receipts(self):
 		submitted = frappe.db.sql(
@@ -205,6 +198,127 @@ class JobOrderP1(Document):
 		)
 		for r in drafts:
 			frappe.delete_doc("Job Order P1 Receipt", r.name, ignore_permissions=True, force=True)
+
+	# ---- tolerance validation ----
+
+	def validate_jop1_tolerance(self):
+		"""Block submit if any SO Item would be over-ordered beyond the tolerance tier.
+
+		Non-bundle SO items: compare JO P1 qty directly against the SO Item qty.
+		Bundle SO items: the JO P1 rows carry the packed *component* item code; compare
+		against (SO Item qty × packed-component qty-per-set) from the Product Bundle
+		table so the tolerance always applies to the actual component qty, not the
+		parent-bundle set qty.
+		"""
+		tolerance_rows = frappe.get_all(
+			"IIB Settings JOP1 Tolerance",
+			filters={"parent": "IIB Settings", "parenttype": "IIB Settings"},
+			fields=["jop1_qty", "jop1_toleransi"],
+			order_by="jop1_qty asc",
+		)
+		if not tolerance_rows:
+			return  # No table configured — allow any qty
+
+		# Group current-doc qtys by (sales_order_item, item_code).
+		# For bundles a single SO item can have multiple packed components, so we
+		# must key on the component as well.
+		current_qty_map: dict = {}
+		for row in self.items:
+			if not row.sales_order_item:
+				continue
+			key = (row.sales_order_item, row.item_code or "")
+			current_qty_map[key] = flt(current_qty_map.get(key, 0)) + flt(row.qty)
+
+		for (so_item_name, item_code), current_qty in current_qty_map.items():
+			so_data = frappe.db.get_value(
+				"Sales Order Item",
+				so_item_name,
+				["qty", "item_code", "custom_jop1_qty"],
+				as_dict=True,
+			)
+			if not so_data:
+				continue
+
+			is_bundle = frappe.db.exists("Product Bundle", so_data.item_code)
+
+			if is_bundle:
+				# Reference qty = SO set qty × packed-component qty-per-set
+				packed_qty_per_set = frappe.db.get_value(
+					"Product Bundle Item",
+					{"parent": so_data.item_code, "item_code": item_code},
+					"qty",
+				)
+				if not packed_qty_per_set:
+					continue  # Component not in bundle definition — skip
+				so_qty = flt(so_data.qty) * flt(packed_qty_per_set)
+				# Previously submitted JO P1 qty for this specific component + SO item
+				# (excluding the current document so resubmit / amend works correctly)
+				prev_jop1_qty = flt(
+					frappe.db.sql(
+						"""
+						SELECT IFNULL(SUM(i.qty), 0)
+						FROM `tabJob Order P1 Item` i
+						JOIN `tabJob Order P1` p ON p.name = i.parent
+						WHERE i.sales_order_item = %s
+						  AND i.item_code = %s
+						  AND p.docstatus = 1
+						  AND p.name != %s
+						""",
+						(so_item_name, item_code, self.name),
+					)[0][0]
+				)
+			else:
+				so_qty = flt(so_data.qty)
+				prev_jop1_qty = flt(so_data.custom_jop1_qty or 0)
+
+			total_qty = prev_jop1_qty + current_qty
+			tolerance = lookup_tolerance(
+				tolerance_rows, so_qty, "jop1_qty", "jop1_toleransi"
+			)
+
+			if total_qty > so_qty + tolerance:
+				display_item = item_code if is_bundle else so_data.item_code
+				frappe.throw(
+					_(
+						"SO Item {0} (item {1}): total JO P1 qty {2} exceeds "
+						"packed component SO qty {3} + tolerance {4} = {5}."
+					).format(
+						frappe.bold(so_item_name),
+						frappe.bold(display_item),
+						frappe.bold(flt(total_qty, 3)),
+						so_qty,
+						tolerance,
+						frappe.bold(so_qty + tolerance),
+					)
+				)
+
+	# ---- SO Item JO P1 qty sync ----
+
+	def update_so_item_jop1_qty(self):
+		"""Recompute custom_jop1_qty on each affected Sales Order Item.
+
+		Called after submit AND cancel so the field always reflects the live
+		total of all submitted (docstatus=1) JO P1 Item qtys for that SO line.
+		"""
+		so_item_names = {r.sales_order_item for r in self.items if r.sales_order_item}
+		for so_item_name in so_item_names:
+			recomputed = frappe.db.sql(
+				"""
+				SELECT IFNULL(SUM(i.qty), 0)
+				FROM `tabJob Order P1 Item` i
+				JOIN `tabJob Order P1` p ON p.name = i.parent
+				WHERE i.sales_order_item = %s
+				  AND p.docstatus = 1
+				""",
+				(so_item_name,),
+			)[0][0]
+			frappe.db.set_value(
+				"Sales Order Item",
+				so_item_name,
+				"custom_jop1_qty",
+				flt(recomputed),
+				update_modified=False,
+			)
 
 	# ---- post-receipt recompute ----
 
@@ -262,6 +376,11 @@ class JobOrderP1(Document):
 
 
 # -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------
 # Whitelisted endpoints
 # -----------------------------------------------------------------------------
 
@@ -289,7 +408,7 @@ def make_jop1_receipt(source_name, target_doc=None):
 		target_row.qty = pending
 		target_row.job_order_p1 = source_parent.name
 		target_row.job_order_p1_item = source_row.name
-		target_row.target_warehouse = source_row.target_warehouse or source_parent.target_warehouse
+		target_row.target_warehouse = JOP1_TARGET_WAREHOUSE
 		target_row.basic_rate = (
 			frappe.db.get_value("Item", source_row.item_code, "custom_basic_rate") or 0
 		)
@@ -337,28 +456,256 @@ def update_status(status, name):
 
 
 @frappe.whitelist()
-def get_so_items_for_jop1(sales_orders):
-	"""Fetch submitted Sales Order Item rows for the picker."""
+def get_items_from_so_for_jop1(source_name, target_doc=None, kwargs=None):
+	"""Map Sales Order items into a Job Order P1 document.
+
+	Called by ``frappe.model.mapper.map_docs`` via ``erpnext.utils.map_current_doc``.
+	``kwargs`` may contain ``filtered_children`` — a list of Sales Order Item row names
+	selected in the child-item-selection dialog.  When the list is present only those
+	rows are mapped; when absent all rows are mapped.
+
+	Product Bundle items are automatically expanded to their packed components.
+	"""
+	if isinstance(target_doc, str):
+		target_doc = frappe.get_doc(json.loads(target_doc))
+	if isinstance(kwargs, str):
+		kwargs = json.loads(kwargs)
+	kwargs = frappe._dict(kwargs or {})
+	filtered_children = kwargs.get("filtered_children") or []
+
+	so = frappe.get_doc("Sales Order", source_name)
+	if so.docstatus != 1:
+		frappe.throw(_("Sales Order {0} is not submitted").format(source_name))
+	customer = so.customer
+
+	for so_item in so.items:
+		if filtered_children and so_item.name not in filtered_children:
+			continue
+
+		packed_items = frappe.get_all(
+			"Product Bundle Item",
+			filters={"parent": so_item.item_code},
+			fields=["item_code", "description", "qty as qty_per_bundle"],
+			order_by="idx",
+		)
+
+		if packed_items:
+			for packed_item in packed_items:
+				item_meta = (
+					frappe.db.get_value(
+						"Item", packed_item["item_code"], ["item_name", "stock_uom"], as_dict=True
+					)
+					or {}
+				)
+				target_doc.append(
+					"items",
+					{
+						"sales_order": source_name,
+						"sales_order_item": so_item.name,
+						"item_code": packed_item["item_code"],
+						"item_name": item_meta.get("item_name") or packed_item["item_code"],
+						"description": packed_item.get("description") or "",
+						"uom": item_meta.get("stock_uom") or "Nos",
+						"qty": flt(so_item.qty) * flt(packed_item["qty_per_bundle"]),
+						"rate": 0,
+						"delivery_date": so_item.delivery_date,
+						"customer": customer,
+					},
+				)
+		else:
+			target_doc.append(
+				"items",
+				{
+					"sales_order": source_name,
+					"sales_order_item": so_item.name,
+					"item_code": so_item.item_code,
+					"item_name": so_item.item_name,
+					"description": so_item.description or "",
+					"uom": so_item.uom,
+					"qty": flt(so_item.qty),
+					"rate": so_item.rate,
+					"delivery_date": so_item.delivery_date,
+					"customer": customer,
+				},
+			)
+
+	return target_doc
+
+
+@frappe.whitelist()
+def get_so_items_for_jop1_dialog(sales_orders):
+	"""Return available SO items for the custom two-step JO P1 picker dialog.
+
+	Accepts a JSON list of Sales Order names.  For each SO:
+	  - Skips lines already booked on an active (non-Completed/Closed/Cancelled)
+	    submitted JO P1, or lines that are fully received.
+	  - Expands Product Bundle lines to their packed components so the dialog
+	    shows the actual item codes that will land in the JO P1.
+	  - Includes ``jop1_qty`` (= ``custom_jop1_qty`` on Sales Order Item) so the
+	    dialog can show how much has already been ordered.
+
+	Returns a flat list of dicts, one per item row to display.
+	"""
 	if isinstance(sales_orders, str):
 		sales_orders = json.loads(sales_orders)
 	if not sales_orders:
 		return []
-	rows = frappe.get_all(
-		"Sales Order Item",
-		filters={"parent": ("in", sales_orders)},
-		fields=[
-			"name as sales_order_item",
-			"parent as sales_order",
-			"item_code",
-			"item_name",
-			"description",
-			"uom",
-			"qty",
-			"rate",
-			"delivery_date",
-		],
-		order_by="parent, idx",
+
+	result = []
+	for so_name in sales_orders:
+		so = frappe.get_doc("Sales Order", so_name)
+		if so.docstatus != 1:
+			continue
+
+		customer = so.customer
+
+		for so_item in so.items:
+			jop1_qty = flt(so_item.get("custom_jop1_qty") or 0)
+
+			packed_items = frappe.get_all(
+				"Product Bundle Item",
+				filters={"parent": so_item.item_code},
+				fields=["item_code", "description", "qty as qty_per_bundle"],
+				order_by="idx",
+			)
+
+			if packed_items:
+				# Bundle → one result row per packed component
+				for packed_item in packed_items:
+					item_meta = (
+						frappe.db.get_value(
+							"Item",
+							packed_item["item_code"],
+							["item_name", "stock_uom"],
+							as_dict=True,
+						)
+						or {}
+					)
+					result.append(
+						{
+							"sales_order": so_name,
+							"sales_order_item": so_item.name,
+							"item_code": packed_item["item_code"],
+							"item_name": item_meta.get("item_name") or packed_item["item_code"],
+							"description": packed_item.get("description") or "",
+							"uom": item_meta.get("stock_uom") or "Nos",
+							"qty": flt(so_item.qty) * flt(packed_item["qty_per_bundle"]),
+							"jop1_qty": jop1_qty,
+							"delivery_date": str(so_item.delivery_date) if so_item.delivery_date else "",
+							"customer": customer,
+						}
+					)
+			else:
+				result.append(
+					{
+						"sales_order": so_name,
+						"sales_order_item": so_item.name,
+						"item_code": so_item.item_code,
+						"item_name": so_item.item_name or so_item.item_code,
+						"description": so_item.description or "",
+						"uom": so_item.uom,
+						"qty": flt(so_item.qty),
+						"jop1_qty": jop1_qty,
+						"delivery_date": str(so_item.delivery_date) if so_item.delivery_date else "",
+						"customer": customer,
+					}
+				)
+
+	return result
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_so_component_items(doctype, txt, searchfield, start, page_len, filters):
+	"""Custom item_code search for the JO P1 items child table.
+
+	Returns Component stock items that belong to the selected Sales Order —
+	either directly as a non-bundle line, or as a packed component of a bundle
+	line on that SO.  Falls back to all Component stock items when no SO is given.
+	"""
+	sales_order = (filters or {}).get("sales_order")
+
+	if sales_order:
+		so_item_codes = frappe.get_all(
+			"Sales Order Item",
+			filters={"parent": sales_order},
+			pluck="item_code",
+		)
+
+		# Expand any bundle items to their packed components
+		allowed: set = set()
+		for ic in so_item_codes:
+			packed = frappe.get_all(
+				"Product Bundle Item",
+				filters={"parent": ic},
+				pluck="item_code",
+			)
+			if packed:
+				allowed.update(packed)
+			else:
+				allowed.add(ic)
+
+		if not allowed:
+			return []
+
+		return frappe.db.sql(
+			"""
+			SELECT name, item_name
+			FROM `tabItem`
+			WHERE name IN %(allowed)s
+			  AND is_stock_item = 1
+			  AND item_group = 'Component'
+			  AND (name LIKE %(txt)s OR item_name LIKE %(txt)s)
+			ORDER BY name
+			LIMIT %(start)s, %(page_len)s
+			""",
+			{"allowed": list(allowed), "txt": f"%{txt}%", "start": start, "page_len": page_len},
+		)
+
+	# No SO selected — show all Component stock items
+	return frappe.db.sql(
+		"""
+		SELECT name, item_name
+		FROM `tabItem`
+		WHERE is_stock_item = 1
+		  AND item_group = 'Component'
+		  AND (name LIKE %(txt)s OR item_name LIKE %(txt)s)
+		ORDER BY name
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{"txt": f"%{txt}%", "start": start, "page_len": page_len},
 	)
-	for row in rows:
-		row["customer"] = frappe.db.get_value("Sales Order", row["sales_order"], "customer")
-	return rows
+
+
+@frappe.whitelist()
+def get_so_item_for_component(sales_order, item_code):
+	"""Return the Sales Order Item name that corresponds to a component item_code.
+
+	Checks direct matches first, then bundle expansion (packed components).
+	Used client-side to auto-fill sales_order_item when item_code is selected.
+	"""
+	# Direct match: SO item whose item_code IS the component
+	direct = frappe.db.get_value(
+		"Sales Order Item",
+		{"parent": sales_order, "item_code": item_code},
+		"name",
+	)
+	if direct:
+		return direct
+
+	# Bundle match: item_code is a packed component of a bundle SO line
+	so_item_codes = frappe.get_all(
+		"Sales Order Item",
+		filters={"parent": sales_order},
+		fields=["name", "item_code"],
+	)
+	for row in so_item_codes:
+		packed = frappe.db.get_value(
+			"Product Bundle Item",
+			{"parent": row.item_code, "item_code": item_code},
+			"name",
+		)
+		if packed:
+			return row.name
+
+	return None

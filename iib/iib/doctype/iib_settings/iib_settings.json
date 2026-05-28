@@ -1,6 +1,6 @@
 {
  "actions": [],
- "creation": "2026-05-16 00:00:00.000000",
+ "creation": "2026-05-16 00:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -15,22 +15,27 @@
   "section_master_card",
   "mc_bundle_item_group",
   "mc_fg_item_group",
-  "section_so_batch",
-  "default_so_warehouse",
   "section_job_order",
   "default_expense_account",
   "column_break_job_order",
   "default_cost_center",
+  "section_stock_entry_type",
+  "jop2_start_stock_entry_type",
   "section_production_plan_p2",
   "default_raw_material_warehouse",
   "default_wip_warehouse",
   "column_break_ppp2",
-  "default_fg_warehouse"
+  "default_fg_warehouse",
+  "section_jop1_tolerance",
+  "jop1_tolerance",
+  "section_jop2_tolerance",
+  "jop2_tolerance"
  ],
  "fields": [
   {
    "fieldname": "master_card_next_number",
    "fieldtype": "Int",
+   "in_list_view": 1,
    "label": "Master Card Next Number",
    "non_negative": 1,
    "reqd": 1
@@ -38,6 +43,7 @@
   {
    "fieldname": "section_bom_creator",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "BOM Creator Defaults"
   },
   {
@@ -75,6 +81,7 @@
   {
    "fieldname": "section_master_card",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "Master Card Defaults"
   },
   {
@@ -90,17 +97,6 @@
    "fieldtype": "Link",
    "label": "FG Item Group",
    "options": "Item Group"
-  },
-  {
-   "fieldname": "section_so_batch",
-   "fieldtype": "Section Break",
-   "label": "SO Batch Defaults"
-  },
-  {
-   "fieldname": "default_so_warehouse",
-   "fieldtype": "Link",
-   "label": "Default SO Warehouse",
-   "options": "Warehouse"
   },
   {
    "fieldname": "section_job_order",
@@ -124,40 +120,73 @@
    "options": "Cost Center"
   },
   {
+   "fieldname": "section_stock_entry_type",
+   "fieldtype": "Section Break",
+   "label": "Stock Entry Type Defaults"
+  },
+  {
+   "description": "Stock Entry Type used by the Return Components action on Job Order P2 (filter: Material Transfer)",
+   "fieldname": "jop2_start_stock_entry_type",
+   "fieldtype": "Link",
+   "label": "Return Components SE Type",
+   "options": "Stock Entry Type"
+  },
+  {
    "fieldname": "section_production_plan_p2",
    "fieldtype": "Section Break",
    "label": "Production Plan P2 Defaults"
   },
   {
+   "default": "Raw Material - IIB",
    "fieldname": "default_raw_material_warehouse",
    "fieldtype": "Link",
    "label": "Raw Material Warehouse",
-   "options": "Warehouse",
-   "default": "Raw Material - IIB"
+   "options": "Warehouse"
   },
   {
+   "default": "Work In Progress - IIB",
    "fieldname": "default_wip_warehouse",
    "fieldtype": "Link",
    "label": "WIP Warehouse",
-   "options": "Warehouse",
-   "default": "Work In Progress - IIB"
+   "options": "Warehouse"
   },
   {
    "fieldname": "column_break_ppp2",
    "fieldtype": "Column Break"
   },
   {
+   "default": "Finished Goods - IIB",
    "fieldname": "default_fg_warehouse",
    "fieldtype": "Link",
    "label": "FG Warehouse",
-   "options": "Warehouse",
-   "default": "Finished Goods - IIB"
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "section_jop1_tolerance",
+   "fieldtype": "Section Break",
+   "label": "Job Order P1 Tolerance"
+  },
+  {
+   "fieldname": "jop1_tolerance",
+   "fieldtype": "Table",
+   "label": "JO P1 Tolerance",
+   "options": "IIB Settings JOP1 Tolerance"
+  },
+  {
+   "fieldname": "section_jop2_tolerance",
+   "fieldtype": "Section Break",
+   "label": "Job Order P2 Tolerance"
+  },
+  {
+   "fieldname": "jop2_tolerance",
+   "fieldtype": "Table",
+   "label": "JO P2 Tolerance",
+   "options": "IIB Settings JOP2 Tolerance"
   }
  ],
- "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-05-22 09:00:00.000000",
+ "modified": "2026-05-28 10:42:30.301205",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "IIB Settings",
@@ -174,6 +203,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

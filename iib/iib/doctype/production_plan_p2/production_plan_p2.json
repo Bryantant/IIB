@@ -27,6 +27,9 @@
   "sec_items",
   "combine_items",
   "po_items",
+  "so_item_allocations",
+  "sec_section_assignments",
+  "section_assignments",
   "sec_totals",
   "total_planned_qty",
   "total_produced_qty",
@@ -166,6 +169,26 @@
    "fieldtype": "Table",
    "label": "Items",
    "options": "Production Plan P2 Item"
+  },
+  {
+   "fieldname": "so_item_allocations",
+   "fieldtype": "Table",
+   "hidden": 1,
+   "label": "SO Item Allocations",
+   "options": "Production Plan P2 SO Allocation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_section_assignments",
+   "fieldtype": "Section Break",
+   "label": "Section Assignments"
+  },
+  {
+   "fieldname": "section_assignments",
+   "fieldtype": "Table",
+   "label": "Section Assignments",
+   "options": "Production Plan P2 Section Assignment",
+   "description": "Map each Section Group to the specific machine (leaf section) that will run it. Auto-filled when you click Get Items. Required before creating Job Orders."
   },
   {
    "collapsible": 1,

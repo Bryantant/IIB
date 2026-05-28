@@ -4,6 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import flt
 
 ITEM_SPEC_FIELDS = [
 	"custom_part_no",
@@ -51,6 +52,7 @@ class MasterCard(Document):
 
 	def before_save(self):
 		self._populate_defaults()
+		self._calculate_price_items()
 		self._ensure_bundle_item()
 		self._sync_fg_items()
 		self._create_product_bundle()
@@ -58,6 +60,8 @@ class MasterCard(Document):
 
 	def validate(self):
 		self._validate_components()
+		self._calculate_price_items()
+		self._validate_price_items()
 		self._validate_processes()
 
 	# ------------------------------------------------------------------
@@ -70,8 +74,8 @@ class MasterCard(Document):
 				"Company"
 			) or frappe.db.get_single_value("Global Defaults", "default_company")
 
-		if self.company and not self.currency:
-			self.currency = frappe.get_cached_value("Company", self.company, "default_currency")
+		if not self.currency:
+			self.currency = "SGD"
 
 		if not self.rm_cost_as_per:
 			self.rm_cost_as_per = "Valuation Rate"
@@ -162,6 +166,7 @@ class MasterCard(Document):
 			row.component = letter
 			if not row.sequence or row.sequence <= 0:
 				frappe.throw(_("Process row {0}: Sequence must be a positive integer.").format(row.idx))
+			self._validate_process_section_group(row)
 			key = (letter, row.sequence)
 			if key in seen:
 				frappe.throw(
@@ -170,6 +175,63 @@ class MasterCard(Document):
 					)
 				)
 			seen.add(key)
+
+	def _calculate_price_items(self):
+		for row in self.price_items or []:
+			row.component = (row.component or "").upper().strip()
+			row.total = (
+				flt(row.material)
+				+ flt(row.labour)
+				+ flt(row.profit)
+				+ flt(row.ext_profit)
+			)
+
+	def _validate_price_items(self):
+		valid_components = {row.component.upper() for row in self.items if row.component}
+		seen = set()
+		for row in self.price_items or []:
+			if not row.component:
+				frappe.throw(_("Price row {0}: Component is required.").format(row.idx))
+
+			component = row.component.upper().strip()
+			row.component = component
+			if component not in valid_components:
+				frappe.throw(
+					_("Price row {0}: Component '{1}' does not exist in Finish Goods.").format(
+						row.idx, component
+					)
+				)
+
+			if flt(row.moq_qty) <= 0:
+				frappe.throw(_("Price row {0}: MOQ Qty must be greater than zero.").format(row.idx))
+
+			key = (flt(row.moq_qty), component)
+			if key in seen:
+				frappe.throw(
+					_("Price row {0}: Duplicate price for MOQ {1} and component '{2}'.").format(
+						row.idx, row.moq_qty, component
+					)
+				)
+			seen.add(key)
+
+	def _validate_process_section_group(self, row):
+		if not row.section:
+			frappe.throw(_("Process row {0}: Section Group is required.").format(row.idx))
+
+		section = frappe.db.get_value(
+			"IIB Production Section",
+			row.section,
+			["is_group", "disabled"],
+			as_dict=True,
+		)
+		if not section:
+			frappe.throw(_("Process row {0}: Section Group {1} does not exist.").format(row.idx, row.section))
+		if section.disabled or not section.is_group:
+			frappe.throw(
+				_("Process row {0}: Section Group must be an enabled group section.").format(
+					row.idx
+				)
+			)
 
 	def _sync_fg_items(self):
 		customer = self.customer or None

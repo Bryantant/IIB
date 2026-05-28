@@ -6,11 +6,14 @@ from frappe.utils import flt, time_diff_in_seconds
 
 class JobCardP2(Document):
 	def validate(self):
+		self.set_sections_from_job_order_operation()
 		self.compute_time_log_totals()
 		self.validate_completed_vs_for_quantity()
+		self.validate_section_group()
+		self.validate_leaf_section(require_section=False)
 
 	def before_submit(self):
-		self.validate_unique_per_machine_day()
+		self.validate_leaf_section(require_section=True)
 		if not self.time_logs:
 			frappe.throw(_("Add at least one Time Log row before submitting"))
 		self.status = "Completed"
@@ -53,31 +56,78 @@ class JobCardP2(Document):
 				).format(self.total_completed_qty, self.for_quantity, reject_qty)
 			)
 
-	def validate_unique_per_machine_day(self):
-		clash = frappe.db.sql(
-			"""
-			SELECT name FROM `tabJob Card P2`
-			WHERE posting_date = %(d)s
-			  AND section = %(s)s
-			  AND machine_no = %(m)s
-			  AND docstatus = 1
-			  AND name != %(self)s
-			LIMIT 1
-			""",
-			{
-				"d": self.posting_date,
-				"s": self.section,
-				"m": self.machine_no,
-				"self": self.name or "",
-			},
+	def validate_section_group(self):
+		if not self.section_group:
+			return
+		group = frappe.db.get_value(
+			"IIB Production Section",
+			self.section_group,
+			["is_group", "disabled"],
 			as_dict=True,
 		)
-		if clash:
+		if not group:
+			frappe.throw(_("Section Group {0} does not exist").format(self.section_group))
+		if group.disabled or not group.is_group:
+			frappe.throw(_("Section Group must be an enabled group section"))
+
+	def validate_leaf_section(self, require_section=True):
+		if not self.section:
+			if require_section:
+				frappe.throw(
+					_(
+						"Set Production Section on the linked Job Order P2 Operation before submitting Job Card P2"
+					)
+				)
+			return
+
+		section = frappe.db.get_value(
+			"IIB Production Section",
+			self.section,
+			["is_group", "disabled", "lft", "rgt"],
+			as_dict=True,
+		)
+		if not section:
+			frappe.throw(_("Production Section {0} does not exist").format(self.section))
+		if section.disabled or section.is_group:
+			frappe.throw(_("Production Section must be an enabled detail section"))
+
+		if not self.section_group:
+			return
+
+		group = frappe.db.get_value(
+			"IIB Production Section",
+			self.section_group,
+			["is_group", "disabled", "lft", "rgt"],
+			as_dict=True,
+		)
+		if not group:
+			frappe.throw(_("Section Group {0} does not exist").format(self.section_group))
+		if group.disabled or not group.is_group:
+			frappe.throw(_("Section Group must be an enabled group section"))
+		if not (section.lft > group.lft and section.rgt < group.rgt):
 			frappe.throw(
-				_("Another Job Card P2 already exists for {0} on {1} machine {2}: {3}").format(
-					self.section, self.posting_date, self.machine_no, clash[0].name
+				_("Production Section {0} must be under Section Group {1}").format(
+					self.section, self.section_group
 				)
 			)
+
+	def set_sections_from_job_order_operation(self):
+		if not self.job_order_p2 or not self.job_order_p2_operation:
+			return
+
+		operation = frappe.db.get_value(
+			"Job Order P2 Operation",
+			{"name": self.job_order_p2_operation, "parent": self.job_order_p2},
+			["section", "production_section"],
+			as_dict=True,
+		)
+		if not operation:
+			return
+
+		if operation.section:
+			self.section_group = operation.section
+		if operation.production_section:
+			self.section = operation.production_section
 
 	# ---- Job Order P2 rollup ----
 

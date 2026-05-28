@@ -10,6 +10,7 @@
   "transaction_date",
   "delivery_date",
   "column_break_header",
+  "company",
   "currency",
   "conversion_rate",
   "payment_terms_template",
@@ -54,6 +55,15 @@
   {
    "fieldname": "column_break_header",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "remember_last_selected_value": 1
   },
   {
    "fieldname": "currency",
@@ -105,8 +115,9 @@
   },
   {
    "fieldname": "created_sales_orders",
-   "fieldtype": "Long Text",
+   "fieldtype": "Table",
    "label": "Created Sales Orders",
+   "options": "SO Batch Created SO",
    "read_only": 1
   },
   {
