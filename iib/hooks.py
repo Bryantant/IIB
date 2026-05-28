@@ -130,34 +130,11 @@ doctype_js = {"Sales Order": "public/js/sales_order_jo_p2.js"}
 # ---------------
 # Override standard doctype classes
 
-override_doctype_class = {
-	"BOM Creator": "iib.overrides.bom_creator.BOMCreatorExtended",
-	"Production Plan": "iib.overrides.production_plan.ProductionPlanExtended",
-}
-
 # Document Events
 # ---------------
 # Hook on document methods and events
 
-doc_events = {
-	"Work Order": {
-		"on_update": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_work_order",
-		"on_update_after_submit": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_work_order",
-		"on_cancel": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_work_order",
-	},
-	"Material Request": {
-		"on_update": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_material_request",
-		"on_submit": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_material_request",
-		"on_cancel": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_material_request",
-	},
-	"Purchase Order": {
-		"on_update": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
-		"on_submit": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
-		"on_cancel": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
-	},
-	# WIP to FG cascades to JO P2 produced_qty via the doctype's own on_submit/on_cancel
-	# (no separate hook needed — handled inside job_order_p2_wip_to_fg.py)
-}
+# doc_events = {}
 
 # Scheduled Tasks
 # ---------------
@@ -191,9 +168,7 @@ doc_events = {
 # override_whitelisted_methods = {
 # 	"frappe.desk.doctype.event.event.get_events": "iib.event.get_events"
 # }
-override_whitelisted_methods = {
-	"erpnext.manufacturing.doctype.bom_creator.bom_creator.add_sub_assembly": "iib.overrides.bom_creator.add_sub_assembly"
-}
+# override_whitelisted_methods = {}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
