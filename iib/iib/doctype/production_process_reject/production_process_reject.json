@@ -1,0 +1,60 @@
+{
+ "actions": [],
+ "creation": "2026-05-25 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "job_order_p2",
+  "reject_reason",
+  "qty",
+  "remark"
+ ],
+ "fields": [
+  {
+   "fieldname": "job_order_p2",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Job Order",
+   "options": "Job Order P2",
+   "reqd": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "reject_reason",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Reject Reason",
+   "reqd": 1,
+   "columns": 3
+  },
+  {
+   "default": "0",
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Remark",
+   "columns": 3
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-25 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "Production Process Reject",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

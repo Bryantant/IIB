@@ -7,6 +7,9 @@ import frappe
 from frappe import _
 from frappe.utils import flt, nowtime
 
+from iib.iib.doctype.job_order_p1.job_order_p1 import JOP1_TARGET_WAREHOUSE
+from iib.iib.utils.tolerance import lookup_tolerance
+
 from erpnext.controllers.stock_controller import StockController
 
 
@@ -15,6 +18,7 @@ class JobOrderP1Receipt(StockController):
 		self.set_defaults()
 		self.validate_expense_account()
 		self.validate_items()
+		self.validate_receipt_qty_vs_jop1()
 		self.compute_totals()
 		if self.docstatus == 0 and not self.status:
 			self.status = "Draft"
@@ -31,6 +35,8 @@ class JobOrderP1Receipt(StockController):
 			self.expense_account = frappe.db.get_single_value(
 				"IIB Settings", "default_expense_account"
 			)
+		for row in self.items:
+			row.target_warehouse = JOP1_TARGET_WAREHOUSE
 
 	def validate_expense_account(self):
 		if not self.expense_account:
@@ -144,6 +150,87 @@ class JobOrderP1Receipt(StockController):
 					row.idx, row.job_order_p1_item
 				)
 			)
+
+	def validate_receipt_qty_vs_jop1(self):
+		"""Points 1 & 3 — guard against over-receiving beyond JO P1 ordered qty + tolerance.
+
+		Aggregates all rows in *this* receipt by ``job_order_p1_item`` (handles the
+		edge-case where the same JO P1 Item row appears more than once), then checks:
+
+			already_received (submitted receipts) + this_receipt_qty
+			    ≤ jop1_item.qty + tolerance_tier
+
+		``jop1_item.received_qty`` is kept in sync only with *submitted* receipts, so a
+		draft being saved/submitted never double-counts itself.
+
+		The tolerance tiers are reused from the IIB Settings JOP1 Tolerance table — the
+		same tiers that govern how much over the SO qty a JO P1 may order.
+
+		DB calls are isolated in ``_get_jop1_tolerance_rows`` and ``_get_jop1_item_data``
+		so unit tests can override them without needing a live Frappe context.
+		"""
+		# --- aggregate this receipt's qty per JO P1 Item row ---
+		receipt_qty_by_item: dict[str, float] = {}
+		for row in self.items:
+			if not row.job_order_p1_item:
+				continue
+			receipt_qty_by_item[row.job_order_p1_item] = (
+				flt(receipt_qty_by_item.get(row.job_order_p1_item, 0)) + flt(row.qty)
+			)
+
+		if not receipt_qty_by_item:
+			return
+
+		tolerance_rows = self._get_jop1_tolerance_rows()
+
+		for jop1_item_name, this_qty in receipt_qty_by_item.items():
+			jop1_item = self._get_jop1_item_data(jop1_item_name)
+			if not jop1_item:
+				continue
+
+			ordered_qty = flt(jop1_item["qty"])
+			already_received = flt(jop1_item["received_qty"])  # submitted receipts only
+			would_receive = already_received + this_qty
+			tolerance = lookup_tolerance(tolerance_rows, ordered_qty, "jop1_qty", "jop1_toleransi")
+
+			if would_receive > ordered_qty + tolerance:
+				max_receivable = max(ordered_qty + tolerance - already_received, 0)
+				frappe.throw(
+					_(
+						"JO P1 {0} — Item {1}: receipt qty {2} would bring total received"
+						" to {3}, exceeding ordered qty {4} + tolerance {5} = {6}."
+						" Maximum receivable now: {7}."
+					).format(
+						frappe.bold(jop1_item["parent"]),
+						frappe.bold(jop1_item["item_code"]),
+						frappe.bold(flt(this_qty, 3)),
+						frappe.bold(flt(would_receive, 3)),
+						ordered_qty,
+						tolerance,
+						frappe.bold(flt(ordered_qty + tolerance, 3)),
+						frappe.bold(flt(max_receivable, 3)),
+					)
+				)
+
+	# -- DB helpers (extracted for unit-test overrideability) --
+
+	def _get_jop1_tolerance_rows(self):
+		"""Return JO P1 tolerance tiers from IIB Settings, sorted asc by qty."""
+		return frappe.get_all(
+			"IIB Settings JOP1 Tolerance",
+			filters={"parent": "IIB Settings", "parenttype": "IIB Settings"},
+			fields=["jop1_qty", "jop1_toleransi"],
+			order_by="jop1_qty asc",
+		)
+
+	def _get_jop1_item_data(self, jop1_item_name):
+		"""Return qty/received_qty/item_code/parent for one JO P1 Item row."""
+		return frappe.db.get_value(
+			"Job Order P1 Item",
+			jop1_item_name,
+			["qty", "received_qty", "item_code", "parent"],
+			as_dict=True,
+		)
 
 	def compute_totals(self):
 		self.total_qty = sum(flt(r.qty) for r in self.items)
@@ -269,6 +356,60 @@ class JobOrderP1Receipt(StockController):
 
 
 @frappe.whitelist()
+def get_jop1_items_for_receipt_dialog(job_order_p1s, filtered_children=None):
+	"""Return pending JO P1 Item rows for the custom two-step selection dialog.
+
+	filtered_children: list of Job Order P1 Item names selected via the
+	allow_child_item_selection checkbox in the Step-1 dialog.  When provided
+	only those specific rows are returned (still subject to pending > 0).
+	When empty / omitted all pending rows for the given JO P1s are returned.
+	"""
+	if isinstance(job_order_p1s, str):
+		job_order_p1s = json.loads(job_order_p1s)
+	if isinstance(filtered_children, str):
+		filtered_children = json.loads(filtered_children)
+	if not job_order_p1s:
+		return []
+
+	filters = {"parent": ("in", job_order_p1s)}
+	if filtered_children:
+		filters["name"] = ("in", filtered_children)
+
+	rows = frappe.get_all(
+		"Job Order P1 Item",
+		filters=filters,
+		fields=[
+			"name as job_order_p1_item",
+			"parent as job_order_p1",
+			"item_code",
+			"item_name",
+			"description",
+			"sales_order",
+			"uom",
+			"qty",
+			"received_qty",
+		],
+		order_by="parent, idx",
+	)
+
+	output = []
+	for r in rows:
+		qty = flt(r.pop("qty"))
+		received_qty = flt(r.pop("received_qty"))
+		pending = qty - received_qty
+		if pending <= 0:
+			continue
+		r["pending_qty"] = pending        # used as row.qty when added to receipt
+		r["received_qty"] = received_qty  # shown in "JO P1 Receipt" column
+		r["basic_rate"] = (
+			frappe.db.get_value("Item", r["item_code"], "custom_basic_rate") or 0
+		)
+		r["target_warehouse"] = JOP1_TARGET_WAREHOUSE
+		output.append(r)
+	return output
+
+
+@frappe.whitelist()
 def get_jop1_items(job_order_p1s):
 	"""Fetch pending JOP1 Item rows for the Get Items From → Job Order P1 picker."""
 	if isinstance(job_order_p1s, str):
@@ -292,12 +433,6 @@ def get_jop1_items(job_order_p1s):
 		order_by="parent, idx",
 	)
 
-	# Cache parent JOP1 target_warehouse for per-row default
-	parent_warehouses = {
-		n: frappe.db.get_value("Job Order P1", n, "target_warehouse")
-		for n in set(r["job_order_p1"] for r in rows)
-	}
-
 	output = []
 	for r in rows:
 		pending = flt(r.pop("qty")) - flt(r.pop("received_qty"))
@@ -307,6 +442,6 @@ def get_jop1_items(job_order_p1s):
 		r["basic_rate"] = (
 			frappe.db.get_value("Item", r["item_code"], "custom_basic_rate") or 0
 		)
-		r["target_warehouse"] = parent_warehouses.get(r["job_order_p1"])
+		r["target_warehouse"] = JOP1_TARGET_WAREHOUSE
 		output.append(r)
 	return output

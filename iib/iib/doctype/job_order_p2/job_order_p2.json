@@ -36,7 +36,7 @@
   "fg_warehouse",
   "sec_result",
   "created_job_cards",
-  "transfer_stock_entry",
+  "transfer_rm_doc",
   "amended_from"
  ],
  "fields": [
@@ -204,8 +204,7 @@
    "fieldname": "sales_order_items",
    "fieldtype": "Table",
    "label": "Sales Order Items",
-   "options": "Job Order P2 Sales Order Item",
-   "reqd": 1
+   "options": "Job Order P2 Sales Order Item"
   },
   {
    "fieldname": "sec_operations",
@@ -254,10 +253,10 @@
    "read_only": 1
   },
   {
-   "fieldname": "transfer_stock_entry",
+   "fieldname": "transfer_rm_doc",
    "fieldtype": "Link",
-   "label": "Material Transfer Stock Entry",
-   "options": "Stock Entry",
+   "label": "RM Transfer",
+   "options": "Job Order P2 RM to WIP",
    "read_only": 1
   },
   {
@@ -273,7 +272,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-22 10:00:00.000000",
+ "modified": "2026-05-26 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order P2",

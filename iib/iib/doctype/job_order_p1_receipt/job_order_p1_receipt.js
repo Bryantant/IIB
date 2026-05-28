@@ -11,8 +11,10 @@ frappe.ui.form.on("Job Order P1 Receipt", {
 		add_get_items_button(frm);
 	},
 	onload_post_render(frm) {
-		// Filter item_code child link to stock items only
-		frm.set_query("item_code", "items", () => ({ filters: { is_stock_item: 1 } }));
+		// Filter item_code to stock items in the Component item group
+		frm.set_query("item_code", "items", () => ({
+			filters: { is_stock_item: 1, item_group: "Component" },
+		}));
 	},
 	company(frm) {
 		set_account_queries(frm);
@@ -75,18 +77,33 @@ function add_get_items_button(frm) {
 	if (frm.doc.docstatus !== 0) return;
 	frm.add_custom_button(
 		__("Job Order P1"),
-		() => open_jop1_picker(frm),
+		() => open_jop1_selector(frm),
 		__("Get Items From")
 	);
 }
 
-function open_jop1_picker(frm) {
-	new frappe.ui.form.MultiSelectDialog({
+// ---------------------------------------------------------------------------
+// Get Items From → Job Order P1  (two-step custom dialog)
+// ---------------------------------------------------------------------------
+
+/**
+ * Step 1: MultiSelectDialog for JO P1 selection.
+ * The "Select Job Order P1 Item" checkbox (allow_child_item_selection) lets the
+ * user expand each JO P1 row and cherry-pick individual items.  Selected child
+ * names are forwarded as filtered_children so the server only returns those rows.
+ */
+function open_jop1_selector(frm) {
+	const picker = new frappe.ui.form.MultiSelectDialog({
 		doctype: "Job Order P1",
 		target: frm,
-		setters: { customer: null, transaction_date: null },
-		add_filters_group: 1,
 		date_field: "transaction_date",
+		setters: {
+			customer: null,
+			transaction_date: null,
+		},
+		allow_child_item_selection: true,
+		child_fieldname: "items",
+		child_columns: ["item_code", "item_name", "qty", "received_qty"],
 		get_query() {
 			return {
 				filters: {
@@ -95,30 +112,56 @@ function open_jop1_picker(frm) {
 				},
 			};
 		},
-		action(selected) {
-			const job_order_p1s = selected;
-			if (!job_order_p1s.length) return;
-			frappe.call({
-				method: "iib.iib.doctype.job_order_p1_receipt.job_order_p1_receipt.get_jop1_items",
-				args: { job_order_p1s },
-				callback(r) {
-					if (!r.message || !r.message.length) {
-						frappe.show_alert({
-							message: __("No pending Job Order P1 lines found"),
-							indicator: "orange",
-						});
-						return;
-					}
-					r.message.forEach((item) => {
-						const row = frm.add_child("items");
-						Object.assign(row, item);
-					});
-					frm.refresh_field("items");
-					frappe.show_alert({
-						message: __("{0} item(s) added", [r.message.length]),
-						indicator: "green",
-					});
-				},
+		action(selections, args) {
+			if (!selections || !selections.length) return;
+			picker.dialog.hide();
+			const filtered_children = (args && args.filtered_children) || [];
+			open_receipt_item_picker(frm, selections, filtered_children);
+		},
+	});
+}
+
+/**
+ * Step 2: fetch pending items from the server and add them directly to the
+ * child table.  filtered_children narrows results to items the user checked
+ * in Step 1; empty array means all pending items from the selected JO P1s.
+ */
+function open_receipt_item_picker(frm, job_order_p1s, filtered_children) {
+	frappe.call({
+		method:
+			"iib.iib.doctype.job_order_p1_receipt.job_order_p1_receipt.get_jop1_items_for_receipt_dialog",
+		args: { job_order_p1s, filtered_children: filtered_children || [] },
+		freeze: true,
+		freeze_message: __("Loading items…"),
+		callback(r) {
+			const items = r.message || [];
+			if (!items.length) {
+				frappe.msgprint(
+					__(
+						"No pending items found for the selected Job Order P1(s). "
+						+ "All lines may already be fully received."
+					)
+				);
+				return;
+			}
+			items.forEach((item) => {
+				const row = frm.add_child("items");
+				row.job_order_p1      = item.job_order_p1;
+				row.job_order_p1_item = item.job_order_p1_item;
+				row.item_code         = item.item_code;
+				row.item_name         = item.item_name;
+				row.description       = item.description || "";
+				row.sales_order       = item.sales_order || "";
+				row.uom               = item.uom;
+				row.qty               = item.pending_qty;
+				row.basic_rate        = item.basic_rate;
+				row.amount            = flt(item.pending_qty) * flt(item.basic_rate);
+				row.target_warehouse  = item.target_warehouse;
+			});
+			frm.refresh_field("items");
+			frappe.show_alert({
+				message: __("{0} item(s) added.", [items.length]),
+				indicator: "green",
 			});
 		},
 	});

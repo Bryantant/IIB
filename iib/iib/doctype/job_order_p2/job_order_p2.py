@@ -1,11 +1,274 @@
+import json
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, nowdate
 
+from iib.iib.utils.tolerance import lookup_tolerance
+
+
+SO_ITEM_WIP_FIELD = "custom_wip_quantity"
+SO_LINE_DOCTYPES = ("Packed Item", "Sales Order Item")
+
+
+def has_wip_field(doctype):
+	return frappe.db.has_column(doctype, SO_ITEM_WIP_FIELD)
+
+
+def get_so_line_doctype(sales_order_item):
+	if not sales_order_item:
+		return None
+	for doctype in SO_LINE_DOCTYPES:
+		if frappe.db.exists(doctype, sales_order_item):
+			return doctype
+	return None
+
+
+def get_so_line_details(sales_order_item):
+	"""Return normalized Sales Order allocation details.
+
+	`sales_order_item` may be either a Packed Item row (new P2 flow) or a
+	Sales Order Item row (legacy/direct fallback).
+	"""
+	doctype = get_so_line_doctype(sales_order_item)
+	if doctype == "Packed Item":
+		rows = frappe.db.sql(
+			"""
+			SELECT
+				pi.name,
+				'Packed Item' AS doctype,
+				pi.parent AS sales_order,
+				pi.parent_detail_docname AS parent_sales_order_item,
+				pi.item_code,
+				pi.item_name,
+				pi.description,
+				pi.uom,
+				pi.qty,
+				IFNULL(pi.{wip_field}, 0) AS wip_quantity,
+				soi.delivery_date,
+				IFNULL(soi.qty, 0) AS parent_qty,
+				IFNULL(soi.delivered_qty, 0) AS parent_delivered_qty,
+				so.customer,
+				so.status AS so_status,
+				so.docstatus AS so_docstatus
+			FROM `tabPacked Item` pi
+			JOIN `tabSales Order Item` soi ON soi.name = pi.parent_detail_docname
+			JOIN `tabSales Order` so ON so.name = pi.parent
+			WHERE pi.name = %(sales_order_item)s
+			""".format(wip_field=SO_ITEM_WIP_FIELD)
+			if has_wip_field("Packed Item")
+			else """
+			SELECT
+				pi.name,
+				'Packed Item' AS doctype,
+				pi.parent AS sales_order,
+				pi.parent_detail_docname AS parent_sales_order_item,
+				pi.item_code,
+				pi.item_name,
+				pi.description,
+				pi.uom,
+				pi.qty,
+				0 AS wip_quantity,
+				soi.delivery_date,
+				IFNULL(soi.qty, 0) AS parent_qty,
+				IFNULL(soi.delivered_qty, 0) AS parent_delivered_qty,
+				so.customer,
+				so.status AS so_status,
+				so.docstatus AS so_docstatus
+			FROM `tabPacked Item` pi
+			JOIN `tabSales Order Item` soi ON soi.name = pi.parent_detail_docname
+			JOIN `tabSales Order` so ON so.name = pi.parent
+			WHERE pi.name = %(sales_order_item)s
+			""",
+			{"sales_order_item": sales_order_item},
+			as_dict=True,
+		)
+		if not rows:
+			return None
+		row = rows[0]
+		parent_qty = flt(row.parent_qty)
+		parent_delivered = flt(row.parent_delivered_qty)
+		row.delivered_qty = flt(row.qty) * (parent_delivered / parent_qty) if parent_qty else 0
+		return row
+
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			soi.name,
+			'Sales Order Item' AS doctype,
+			soi.parent AS sales_order,
+			soi.name AS parent_sales_order_item,
+			soi.item_code,
+			soi.item_name,
+			soi.description,
+			soi.uom,
+			soi.qty,
+			IFNULL(soi.delivered_qty, 0) AS delivered_qty,
+			{wip_expr} AS wip_quantity,
+			soi.delivery_date,
+			so.customer,
+			so.status AS so_status,
+			so.docstatus AS so_docstatus
+		FROM `tabSales Order Item` soi
+		JOIN `tabSales Order` so ON so.name = soi.parent
+		WHERE soi.name = %(sales_order_item)s
+		""".format(
+			wip_expr=f"IFNULL(soi.{SO_ITEM_WIP_FIELD}, 0)"
+			if has_wip_field("Sales Order Item")
+			else "0"
+		),
+		{"sales_order_item": sales_order_item},
+		as_dict=True,
+	)
+	return rows[0] if rows else None
+
+
+def get_live_so_item_wip_qty(sales_order_item, exclude_job_order=None):
+	if not sales_order_item:
+		return 0
+
+	conditions = [
+		"josi.parenttype = 'Job Order P2'",
+		"josi.sales_order_item = %(sales_order_item)s",
+		"jop2.docstatus = 1",
+	]
+	values = {"sales_order_item": sales_order_item}
+	if exclude_job_order:
+		conditions.append("jop2.name != %(exclude_job_order)s")
+		values["exclude_job_order"] = exclude_job_order
+
+	return flt(
+		frappe.db.sql(
+			f"""
+			SELECT IFNULL(SUM(josi.qty), 0)
+			FROM `tabJob Order P2 Sales Order Item` josi
+			JOIN `tabJob Order P2` jop2 ON jop2.name = josi.parent
+			WHERE {" AND ".join(conditions)}
+			""",
+			values,
+		)[0][0]
+	)
+
+
+def get_job_order_so_item_qty(job_order, sales_order_item):
+	if not job_order or not sales_order_item:
+		return 0
+	return flt(
+		frappe.db.sql(
+			"""
+			SELECT IFNULL(SUM(qty), 0)
+			FROM `tabJob Order P2 Sales Order Item`
+			WHERE parenttype = 'Job Order P2'
+			  AND parent = %(job_order)s
+			  AND sales_order_item = %(sales_order_item)s
+			""",
+			{"job_order": job_order, "sales_order_item": sales_order_item},
+		)[0][0]
+	)
+
+
+def get_so_item_wip_qty(sales_order_item, exclude_job_order=None):
+	if not sales_order_item:
+		return 0
+	doctype = get_so_line_doctype(sales_order_item)
+	if not doctype or not has_wip_field(doctype):
+		return get_live_so_item_wip_qty(sales_order_item, exclude_job_order)
+
+	wip_qty = flt(
+		frappe.db.get_value(doctype, sales_order_item, SO_ITEM_WIP_FIELD)
+	)
+	if exclude_job_order:
+		wip_qty -= get_job_order_so_item_qty(exclude_job_order, sales_order_item)
+	return max(wip_qty, 0)
+
+
+def get_so_item_available_qty(sales_order_item, exclude_job_order=None):
+	so_item = get_so_line_details(sales_order_item)
+	if not so_item:
+		return 0
+	return max(
+		flt(so_item.qty)
+		- flt(so_item.delivered_qty)
+		- get_so_item_wip_qty(sales_order_item, exclude_job_order),
+		0,
+	)
+
+
+def sync_so_item_wip_quantities(sales_order_items, exclude_job_order=None):
+	for sales_order_item in sorted({d for d in sales_order_items if d}):
+		doctype = get_so_line_doctype(sales_order_item)
+		if not doctype or not has_wip_field(doctype):
+			continue
+		frappe.db.set_value(
+			doctype,
+			sales_order_item,
+			SO_ITEM_WIP_FIELD,
+			get_live_so_item_wip_qty(sales_order_item, exclude_job_order),
+			update_modified=False,
+		)
+
+
+def is_blank_so_item_row(row):
+	return not any(
+		[
+			row.sales_order,
+			row.sales_order_item,
+			row.item_code,
+			row.delivery_date,
+			row.customer,
+			row.so_status,
+			flt(row.qty),
+		]
+	)
+
+
+def get_master_card_operations_for_item(production_item, master_card=None):
+	if not production_item:
+		return {"master_card": master_card or "", "operations": []}
+
+	master_card = master_card or frappe.db.get_value(
+		"Master Card Item", {"item_code": production_item}, "parent"
+	)
+	if not master_card:
+		return {"master_card": "", "operations": []}
+
+	mc = frappe.get_cached_doc("Master Card", master_card)
+	component_letter = None
+	for row in mc.items:
+		if row.item_code == production_item:
+			component_letter = (row.component or "").upper()
+			break
+	if not component_letter:
+		return {"master_card": master_card, "operations": []}
+
+	processes = sorted(
+		[p for p in (mc.processes or []) if (p.component or "").upper() == component_letter],
+		key=lambda p: p.sequence,
+	)
+	return {
+		"master_card": master_card,
+		"operations": [
+			{
+				"sequence": p.sequence,
+				"section": p.section,
+				"production_section": "",
+				"est_time_mins": p.est_time_mins,
+				"description": p.description,
+				"status": "Pending",
+				"completed_qty": 0,
+			}
+			for p in processes
+		],
+	}
+
 
 class JobOrderP2(Document):
 	def before_validate(self):
+		self.set(
+			"sales_order_items",
+			[row for row in (self.sales_order_items or []) if not is_blank_so_item_row(row)],
+		)
 		# Reset operations if production_item changed
 		if not self.is_new() and self.has_value_changed("production_item"):
 			self.operations = []
@@ -15,33 +278,77 @@ class JobOrderP2(Document):
 		self.resolve_master_card()
 		self.set_warehouse_defaults()
 		self.validate_so_items_match_production_item()
+		self.validate_so_item_quantities()
 		self.resolve_operations_from_master_card()
+		self.validate_operation_section_groups()
+		self.validate_operation_production_sections(require_section=False)
 		self.compute_rollup_fields()
 		if self.docstatus == 0 and not self.status:
 			self.status = "Draft"
 
+	def before_save(self):
+		self.flags.previous_so_item_refs = self.get_previous_so_item_refs()
+
 	def before_submit(self):
-		self.validate_operations_exist()
+		# NOTE: operations are optional — no validate_operations_exist() call
+		# NOTE: production_section is intentionally NOT required here — it is filled
+		#       later by the Production Process doctype when work is assigned.
 		self.validate_so_items_exist()
+		self.validate_operation_production_sections(require_section=False)
+		self.validate_jop2_tolerance()
 
 	def on_submit(self):
-		self.db_set("status", "In Process")
-		self.create_job_cards()
-		self.create_and_submit_material_transfer_se()
+		self.db_set("status", "Not Started")
+		# NOTE: Job Card P2 retired — operations are now tracked via Production Process.
+		# create_job_cards() intentionally removed.
+		# custom_wip_quantity now counts submitted JOP2s only — sync after submit.
+		self.sync_current_so_item_wip_quantities()
 
 	def before_cancel(self):
 		self.guard_against_submitted_job_cards()
-		self.guard_against_submitted_stock_entries()
+		self.guard_against_submitted_movement_docs()
 
 	def on_cancel(self):
 		self.delete_draft_job_cards()
+		self.cancel_draft_rm_to_wip()
 		self.db_set("status", "Cancelled")
 		self.db_set("created_job_cards", "")
+		self.sync_current_so_item_wip_quantities(exclude_self=True)
 		if self.production_plan_p2:
 			plan = frappe.get_doc("Production Plan P2", self.production_plan_p2)
 			plan.recompute_produced_qty()
 
+	def on_trash(self):
+		self.sync_current_so_item_wip_quantities(exclude_self=True)
+
 	# ---- validation helpers ----
+
+	def get_current_so_item_refs(self):
+		return {
+			row.sales_order_item
+			for row in (self.sales_order_items or [])
+			if row.sales_order_item
+		}
+
+	def get_previous_so_item_refs(self):
+		if self.is_new():
+			return set()
+		previous = self.get_doc_before_save()
+		if not previous:
+			return set()
+		return {
+			row.sales_order_item
+			for row in (previous.sales_order_items or [])
+			if row.sales_order_item
+		}
+
+	def sync_current_so_item_wip_quantities(self, exclude_self=False):
+		refs = set(self.get_current_so_item_refs())
+		refs.update(getattr(self.flags, "previous_so_item_refs", set()) or set())
+		sync_so_item_wip_quantities(
+			refs,
+			exclude_job_order=self.name if exclude_self else None,
+		)
 
 	def fetch_item_metadata(self):
 		if not self.production_item:
@@ -88,11 +395,211 @@ class JobOrderP2(Document):
 				)
 			)
 
+	def validate_so_item_quantities(self):
+		if not self.sales_order_items:
+			return
+
+		requested_by_so_item = {}
+		for row in self.sales_order_items:
+			if not row.sales_order_item:
+				frappe.throw(_("Sales Order Item is required in row {0}").format(row.idx))
+			if flt(row.qty) <= 0:
+				frappe.throw(_("Sales Order Item row {0}: Qty must be positive").format(row.idx))
+
+			so_item = get_so_line_details(row.sales_order_item)
+			if not so_item:
+				frappe.throw(
+					_("Sales Order Item {0} does not exist").format(row.sales_order_item)
+				)
+			if so_item.so_docstatus != 1 or so_item.so_status in (
+				"Stopped",
+				"Closed",
+				"Cancelled",
+			):
+				frappe.throw(
+					_("Sales Order {0} is not open for Job Order P2 allocation").format(
+						so_item.sales_order
+					)
+				)
+			if row.sales_order and row.sales_order != so_item.sales_order:
+				frappe.throw(
+					_("Row {0}: Sales Order does not match Sales Order Item {1}").format(
+						row.idx, row.sales_order_item
+					)
+				)
+			if self.production_item and so_item.item_code != self.production_item:
+				frappe.throw(
+					_("Row {0}: Sales Order Item {1} is for item {2}, not {3}").format(
+						row.idx,
+						row.sales_order_item,
+						so_item.item_code,
+						self.production_item,
+					)
+				)
+
+			row.sales_order = so_item.sales_order
+			row.item_code = so_item.item_code
+			row.delivery_date = so_item.delivery_date
+			row.customer = so_item.customer
+			row.so_status = so_item.so_status
+
+			requested_by_so_item[row.sales_order_item] = (
+				requested_by_so_item.get(row.sales_order_item, 0) + flt(row.qty)
+			)
+
+		exclude_job_order = self.name if self.name and not self.is_new() else None
+		for sales_order_item, requested_qty in requested_by_so_item.items():
+			available_qty = get_so_item_available_qty(sales_order_item, exclude_job_order)
+			if requested_qty > available_qty + 0.0001:
+				frappe.throw(
+					_(
+						"Sales Order Item {0}: requested qty {1} exceeds remaining available qty {2}"
+					).format(sales_order_item, requested_qty, available_qty)
+				)
+
 	def validate_so_items_exist(self):
 		if not self.sales_order_items:
 			frappe.throw(
 				_("At least one Sales Order Item is required before submitting Job Order P2")
 			)
+
+	def validate_jop2_tolerance(self):
+		"""Block submit if any SO Item / Packed Item row would be over-ordered.
+
+		Mirrors JOP1's `validate_jop1_tolerance` exactly — reads the tiered
+		`IIB Settings JOP2 Tolerance` table and compares
+		``prev_custom_wip_quantity + this_jop2_qty`` against
+		``so_qty + tolerance`` per Sales Order line.
+
+		`custom_wip_quantity` already excludes drafts (submitted-only
+		semantics) so the comparison correctly counts only past, locked-in
+		allocations plus this draft's own qty.
+		"""
+		tolerance_rows = frappe.get_all(
+			"IIB Settings JOP2 Tolerance",
+			filters={"parent": "IIB Settings", "parenttype": "IIB Settings"},
+			fields=["jop2_qty", "jop2_toleransi"],
+			order_by="jop2_qty asc",
+		)
+		if not tolerance_rows:
+			return  # No table configured — allow any qty
+
+		# Group current JO P2 qty per sales_order_item (Packed Item row name)
+		current_qty_map: dict = {}
+		for row in self.sales_order_items or []:
+			if not row.sales_order_item:
+				continue
+			current_qty_map[row.sales_order_item] = (
+				flt(current_qty_map.get(row.sales_order_item, 0)) + flt(row.qty)
+			)
+
+		for so_item_name, current_qty in current_qty_map.items():
+			so_line = get_so_line_details(so_item_name)
+			if not so_line:
+				continue
+
+			so_qty = flt(so_line.qty)
+			# `custom_wip_quantity` is submitted-only post-refactor.
+			prev_jop2_qty = flt(get_so_item_wip_qty(so_item_name, exclude_job_order=self.name))
+			total_qty = prev_jop2_qty + current_qty
+
+			tolerance = lookup_tolerance(
+				tolerance_rows, so_qty, "jop2_qty", "jop2_toleransi"
+			)
+
+			if total_qty > so_qty + tolerance:
+				frappe.throw(
+					_(
+						"SO Item {0} (item {1}): total JO P2 qty {2} exceeds SO qty {3} + tolerance {4} = {5}."
+					).format(
+						frappe.bold(so_item_name),
+						frappe.bold(so_line.item_code),
+						frappe.bold(flt(total_qty, 3)),
+						so_qty,
+						tolerance,
+						frappe.bold(so_qty + tolerance),
+					)
+				)
+
+	def validate_operation_section_groups(self):
+		for row in self.operations or []:
+			if not row.section:
+				frappe.throw(_("Operation row {0}: Section Group is required").format(row.idx))
+			section = frappe.db.get_value(
+				"IIB Production Section",
+				row.section,
+				["is_group", "disabled"],
+				as_dict=True,
+			)
+			if not section:
+				frappe.throw(
+					_("Operation row {0}: Section Group {1} does not exist").format(
+						row.idx, row.section
+					)
+				)
+			if section.disabled or not section.is_group:
+				frappe.throw(
+					_("Operation row {0}: Section Group must be an enabled group section").format(
+						row.idx
+					)
+				)
+
+	def validate_operation_production_sections(self, require_section=True):
+		for row in self.operations or []:
+			if not row.production_section:
+				if require_section:
+					frappe.throw(
+						_(
+							"Operation row {0}: Production Section is required before submitting Job Order P2"
+						).format(row.idx)
+					)
+				continue
+
+			section = frappe.db.get_value(
+				"IIB Production Section",
+				row.production_section,
+				["is_group", "disabled", "lft", "rgt"],
+				as_dict=True,
+			)
+			if not section:
+				frappe.throw(
+					_("Operation row {0}: Production Section {1} does not exist").format(
+						row.idx, row.production_section
+					)
+				)
+			if section.disabled or section.is_group:
+				frappe.throw(
+					_("Operation row {0}: Production Section must be an enabled detail section").format(
+						row.idx
+					)
+				)
+
+			if not row.section:
+				continue
+			group = frappe.db.get_value(
+				"IIB Production Section",
+				row.section,
+				["is_group", "disabled", "lft", "rgt"],
+				as_dict=True,
+			)
+			if not group:
+				frappe.throw(
+					_("Operation row {0}: Section Group {1} does not exist").format(
+						row.idx, row.section
+					)
+				)
+			if group.disabled or not group.is_group:
+				frappe.throw(
+					_("Operation row {0}: Section Group must be an enabled group section").format(
+						row.idx
+					)
+				)
+			if not (section.lft > group.lft and section.rgt < group.rgt):
+				frappe.throw(
+					_("Operation row {0}: Production Section {1} must be under Section Group {2}").format(
+						row.idx, row.production_section, row.section
+					)
+				)
 
 	def validate_operations_exist(self):
 		if not self.operations:
@@ -107,32 +614,13 @@ class JobOrderP2(Document):
 		"""Seed operations table from Master Card Process rows for the production item."""
 		if self.operations:
 			return
-		if not self.master_card or not self.production_item:
+		if not self.production_item:
 			return
-		mc = frappe.get_cached_doc("Master Card", self.master_card)
-		component_letter = None
-		for row in mc.items:
-			if row.item_code == self.production_item:
-				component_letter = (row.component or "").upper()
-				break
-		if not component_letter:
-			return
-		processes = sorted(
-			[p for p in (mc.processes or []) if (p.component or "").upper() == component_letter],
-			key=lambda p: p.sequence,
-		)
-		for p in processes:
-			self.append(
-				"operations",
-				{
-					"sequence": p.sequence,
-					"section": p.section,
-					"est_time_mins": p.est_time_mins,
-					"description": p.description,
-					"status": "Pending",
-					"completed_qty": 0,
-				},
-			)
+		data = get_master_card_operations_for_item(self.production_item, self.master_card)
+		if data.get("master_card"):
+			self.master_card = data["master_card"]
+		for row in data.get("operations") or []:
+			self.append("operations", row)
 
 	# ---- Read-only rollup fields ----
 
@@ -146,20 +634,11 @@ class JobOrderP2(Document):
 	def _compute_delivered_qty(self):
 		if not self.sales_order_items:
 			return 0
-		so_item_names = [r.sales_order_item for r in self.sales_order_items if r.sales_order_item]
-		if not so_item_names:
-			return 0
-		placeholders = ", ".join(["%s"] * len(so_item_names))
-		total = frappe.db.sql(
-			f"""
-			SELECT IFNULL(SUM(dni.qty), 0) AS qty
-			FROM `tabDelivery Note Item` dni
-			JOIN `tabDelivery Note` dn ON dn.name = dni.parent
-			WHERE dn.docstatus = 1
-			  AND dni.so_detail IN ({placeholders})
-			""",
-			tuple(so_item_names),
-		)[0][0]
+		total = 0
+		for row in self.sales_order_items:
+			line = get_so_line_details(row.sales_order_item)
+			if line:
+				total += min(flt(row.qty), flt(line.delivered_qty))
 		return flt(total)
 
 	def _compute_closed_qty(self):
@@ -198,7 +677,8 @@ class JobOrderP2(Document):
 			jc.job_order_p2_operation = op.name
 			jc.production_item = self.production_item
 			jc.master_card = self.master_card
-			jc.section = op.section
+			jc.section_group = op.section
+			jc.section = op.production_section
 			jc.for_quantity = self.qty
 			jc.status = "Open"
 			jc.insert(ignore_permissions=True)
@@ -206,17 +686,15 @@ class JobOrderP2(Document):
 		if created:
 			self.db_set("created_job_cards", "\n".join(created))
 
-	# ---- Auto-submitted Material Transfer Stock Entry ----
+	# ---- RM to WIP doc creation (on submit) ----
 
-	def create_and_submit_material_transfer_se(self):
-		"""On submit: move production_item from Raw Material warehouse -> WIP warehouse."""
+	def create_rm_to_wip_doc(self):
+		"""On submit: create a draft Job Order P2 RM to WIP document for review."""
 		settings = frappe.get_cached_doc("IIB Settings")
 		source = settings.default_raw_material_warehouse
 		if not source:
 			frappe.throw(
-				_(
-					"Set Raw Material Warehouse in IIB Settings before submitting Job Order P2"
-				)
+				_("Set Raw Material Warehouse in IIB Settings before submitting Job Order P2")
 			)
 		if not self.wip_warehouse:
 			frappe.throw(_("WIP Warehouse not set"))
@@ -224,42 +702,27 @@ class JobOrderP2(Document):
 			frappe.throw(_("Qty to Convert must be greater than 0"))
 
 		stock_uom = frappe.db.get_value("Item", self.production_item, "stock_uom")
+		basic_rate = (
+			frappe.db.get_value("Item", self.production_item, "custom_basic_rate") or 0
+		)
 
-		se = frappe.new_doc("Stock Entry")
-		se.stock_entry_type = "Material Transfer"
-		se.purpose = "Material Transfer"
-		se.company = self.company
-		se.posting_date = self.posting_date or nowdate()
-		se.from_warehouse = source
-		se.to_warehouse = self.wip_warehouse
-		se.iib_job_order_p2 = self.name
-		se.append(
+		doc = frappe.new_doc("Job Order P2 RM to WIP")
+		doc.company = self.company
+		doc.posting_date = self.posting_date or nowdate()
+		doc.job_order_p2 = self.name
+		doc.source_warehouse = source
+		doc.target_warehouse = self.wip_warehouse
+		doc.append(
 			"items",
 			{
 				"item_code": self.production_item,
 				"qty": flt(self.qty),
-				"transfer_qty": flt(self.qty),
 				"uom": stock_uom,
-				"stock_uom": stock_uom,
-				"conversion_factor": 1,
-				"s_warehouse": source,
-				"t_warehouse": self.wip_warehouse,
+				"basic_rate": flt(basic_rate),
 			},
 		)
-		se.insert(ignore_permissions=True)
-		try:
-			se.submit()
-		except Exception as e:
-			frappe.log_error(
-				title="JO P2 Material Transfer auto-submit failed",
-				message=f"JO: {self.name}, SE: {se.name}, Error: {e}",
-			)
-			frappe.throw(
-				_("Failed to auto-submit Material Transfer Stock Entry {0}: {1}").format(
-					se.name, str(e)
-				)
-			)
-		self.db_set("transfer_stock_entry", se.name)
+		doc.insert(ignore_permissions=True)
+		self.db_set("transfer_rm_doc", doc.name)
 
 	# ---- cancel guards ----
 
@@ -280,21 +743,51 @@ class JobOrderP2(Document):
 				)
 			)
 
-	def guard_against_submitted_stock_entries(self):
-		# Exclude the transfer SE attached to this JO — we will cancel it as part of cancel logic if needed
-		submitted = frappe.db.get_all(
-			"Stock Entry",
-			filters={"iib_job_order_p2": self.name, "docstatus": 1},
-			pluck="name",
+	def guard_against_submitted_movement_docs(self):
+		"""Block cancel if any submitted RM to WIP or WIP to FG docs exist."""
+		rm_to_wip = frappe.db.get_value(
+			"Job Order P2 RM to WIP",
+			{"job_order_p2": self.name, "docstatus": 1},
+			"name",
 		)
-		# Allow cancel if the only submitted SE is the transfer SE — but require user to cancel manually first
-		if submitted:
+		if rm_to_wip:
 			frappe.throw(
 				_(
-					"Cannot cancel: submitted Stock Entries exist for this Job Order: {0}. "
-					"Cancel them manually first."
-				).format(", ".join(submitted))
+					"Cannot cancel: submitted Job Order P2 RM to WIP {0} exists. "
+					"Cancel it first."
+				).format(frappe.bold(rm_to_wip))
 			)
+		wip_to_fg = frappe.db.get_all(
+			"Job Order P2 WIP to FG",
+			filters={"job_order_p2": self.name, "docstatus": 1},
+			fields=["name"],
+		)
+		if wip_to_fg:
+			names = [r.name for r in wip_to_fg]
+			frappe.throw(
+				_(
+					"Cannot cancel: submitted Job Order P2 WIP to FG exist: {0}. "
+					"Cancel them first."
+				).format(", ".join(names))
+			)
+
+	def cancel_draft_rm_to_wip(self):
+		"""Delete draft RM to WIP doc when cancelling JO P2 (submitted ones blocked by guard)."""
+		if not self.transfer_rm_doc:
+			return
+		try:
+			docstatus = frappe.db.get_value(
+				"Job Order P2 RM to WIP", self.transfer_rm_doc, "docstatus"
+			)
+			if docstatus == 0:
+				frappe.delete_doc(
+					"Job Order P2 RM to WIP",
+					self.transfer_rm_doc,
+					ignore_permissions=True,
+					force=True,
+				)
+		except Exception:
+			pass
 
 	def delete_draft_job_cards(self):
 		drafts = frappe.db.sql(
@@ -337,6 +830,9 @@ class JobOrderP2(Document):
 	def _refresh_header_status(self):
 		if self.docstatus != 1 or self.status in ("Cancelled", "Stopped", "Closed"):
 			return
+		if not self.operations:
+			# No operations — status is driven by produced_qty / movement docs, not ops
+			return
 		statuses = [op.status for op in self.operations]
 		if all(s == "Completed" for s in statuses):
 			new = "Completed"
@@ -347,26 +843,63 @@ class JobOrderP2(Document):
 		if new != self.status:
 			self.db_set("status", new)
 
+	def get_status(self):
+		"""Compute status from produced_qty and movement docs. Does not override terminal states."""
+		if self.status in ("Stopped", "Closed", "Cancelled"):
+			return self.status
+		if self.docstatus == 0:
+			return "Draft"
+		if self.docstatus == 2:
+			return "Cancelled"
+		# Submitted — check production progress
+		if flt(self.qty) > 0 and flt(self.produced_qty) >= flt(self.qty):
+			return "Completed"
+		# In Process if RM has been transferred to WIP
+		if frappe.db.exists(
+			"Job Order P2 RM to WIP", {"job_order_p2": self.name, "docstatus": 1}
+		):
+			return "In Process"
+		return "Not Started"
+
+	def update_status(self):
+		"""Recompute and persist status. Safe to call from sub-documents."""
+		new = self.get_status()
+		if new != self.status:
+			self.db_set("status", new)
+		return new
+
 	# ---- Stock Entry rollup (called from Stock Entry submit/cancel hook) ----
 
 	def update_produced_qty(self):
-		"""Recompute produced_qty from submitted Stock Entries (WIP -> FG only)."""
-		total = frappe.db.sql(
+		"""Recompute produced_qty from submitted FGTS docs (primary) + legacy WIP to FG docs."""
+		fgts_total = frappe.db.sql(
 			"""
-			SELECT IFNULL(SUM(sed.transfer_qty), 0) AS qty
-			FROM `tabStock Entry Detail` sed
-			JOIN `tabStock Entry` se ON se.name = sed.parent
-			WHERE se.iib_job_order_p2 = %s
-			  AND se.docstatus = 1
-			  AND sed.item_code = %s
-			  AND IFNULL(sed.t_warehouse, '') = %s
+			SELECT IFNULL(SUM(f.total_qty), 0)
+			FROM `tabFGTS Item` fi
+			JOIN `tabFGTS` f ON f.name = fi.parent
+			WHERE f.job_order_p2 = %s
+			  AND f.docstatus = 1
+			  AND fi.item_code = %s
 			""",
-			(self.name, self.production_item, self.fg_warehouse or ""),
+			(self.name, self.production_item),
 		)[0][0]
+		legacy_total = frappe.db.sql(
+			"""
+			SELECT IFNULL(SUM(i.qty), 0)
+			FROM `tabJob Order P2 WIP to FG Item` i
+			JOIN `tabJob Order P2 WIP to FG` p ON p.name = i.parent
+			WHERE p.job_order_p2 = %s
+			  AND p.docstatus = 1
+			  AND i.item_code = %s
+			""",
+			(self.name, self.production_item),
+		)[0][0]
+		total = flt(fgts_total) + flt(legacy_total)
 		self.db_set("produced_qty", flt(total), update_modified=False)
-		# Update derived jo_qty_in_process
 		jo_qty_in_process = max(flt(self.qty) - flt(total), 0)
 		self.db_set("jo_qty_in_process", jo_qty_in_process, update_modified=False)
+		# Update status (may flip to Completed)
+		self.update_status()
 		if self.production_plan_p2:
 			plan = frappe.get_doc("Production Plan P2", self.production_plan_p2)
 			plan.recompute_produced_qty()
@@ -378,47 +911,47 @@ class JobOrderP2(Document):
 
 
 @frappe.whitelist()
-def make_finish_stock_entry(source_name):
-	"""Build a draft Stock Entry to transfer the FG item from WIP -> FG Warehouse."""
-	jo = frappe.get_doc("Job Order P2", source_name)
+def start_job_order(name):
+	"""Create and immediately submit a Job Order P2 RM to WIP (the 'Start' action).
+
+	Idempotent: if a draft RM to WIP already exists it is submitted; if one is
+	already submitted the call is a no-op and returns the existing doc name.
+	"""
+	jo = frappe.get_doc("Job Order P2", name)
+	frappe.has_permission("Job Order P2", "write", doc=jo, throw=True)
+
 	if jo.docstatus != 1:
-		frappe.throw(_("Job Order P2 must be submitted before Set Finish"))
+		frappe.throw(_("Job Order P2 must be submitted before starting"))
 	if jo.status in ("Cancelled", "Stopped", "Closed"):
-		frappe.throw(_("Job Order P2 is {0}; cannot Set Finish").format(jo.status))
+		frappe.throw(_("Cannot start a {0} Job Order P2").format(jo.status))
 
-	pending = flt(jo.qty) - flt(jo.produced_qty)
-	if pending <= 0:
-		frappe.throw(_("Nothing left to finish for this Job Order P2"))
+	# Already have a linked RM to WIP doc
+	if jo.transfer_rm_doc:
+		rm_doc = frappe.get_doc("Job Order P2 RM to WIP", jo.transfer_rm_doc)
+		if rm_doc.docstatus == 1:
+			# Already submitted — nothing to do
+			return jo.transfer_rm_doc
+		# Draft exists (e.g. legacy) — submit it and flip status
+		rm_doc.submit()
+		jo.db_set("status", "In Process")
+		return rm_doc.name
 
-	stock_uom = frappe.db.get_value("Item", jo.production_item, "stock_uom")
-
-	se = frappe.new_doc("Stock Entry")
-	se.stock_entry_type = "Material Transfer"
-	se.purpose = "Material Transfer"
-	se.company = jo.company
-	se.from_warehouse = jo.wip_warehouse
-	se.to_warehouse = jo.fg_warehouse
-	se.iib_job_order_p2 = jo.name
-	se.append(
-		"items",
-		{
-			"item_code": jo.production_item,
-			"qty": pending,
-			"transfer_qty": pending,
-			"uom": stock_uom,
-			"stock_uom": stock_uom,
-			"conversion_factor": 1,
-			"s_warehouse": jo.wip_warehouse,
-			"t_warehouse": jo.fg_warehouse,
-		},
-	)
-	return se.as_dict()
+	# Create fresh and submit in one step
+	jo.create_rm_to_wip_doc()
+	rm_doc_name = frappe.db.get_value("Job Order P2", name, "transfer_rm_doc")
+	rm_doc = frappe.get_doc("Job Order P2 RM to WIP", rm_doc_name)
+	rm_doc.submit()
+	# Flip JO status to In Process
+	jo.db_set("status", "In Process")
+	return rm_doc.name
 
 
 @frappe.whitelist()
 def make_return_components(source_name):
 	"""Build a draft Stock Entry to return un-consumed material from WIP -> Raw Material warehouse."""
 	jo = frappe.get_doc("Job Order P2", source_name)
+	jo.check_permission("read")
+	frappe.has_permission("Stock Entry", "create", throw=True)
 	if jo.docstatus != 1:
 		frappe.throw(_("Job Order P2 must be submitted before Return Components"))
 
@@ -433,9 +966,14 @@ def make_return_components(source_name):
 
 	stock_uom = frappe.db.get_value("Item", jo.production_item, "stock_uom")
 
+	return_se_type = settings.jop2_start_stock_entry_type or "Material Transfer"
+	return_se_purpose = (
+		frappe.db.get_value("Stock Entry Type", return_se_type, "purpose") or "Material Transfer"
+	)
+
 	se = frappe.new_doc("Stock Entry")
-	se.stock_entry_type = "Material Transfer"
-	se.purpose = "Material Transfer"
+	se.stock_entry_type = return_se_type
+	se.purpose = return_se_purpose
 	se.company = jo.company
 	se.from_warehouse = jo.wip_warehouse
 	se.to_warehouse = target
@@ -459,10 +997,10 @@ def make_return_components(source_name):
 @frappe.whitelist()
 def stop_job_order(name, status):
 	"""Stop / Re-open / Close a submitted Job Order P2."""
-	frappe.has_permission("Job Order P2", "submit", doc=name, throw=True)
 	if status not in ("Stopped", "In Process", "Completed", "Closed"):
 		frappe.throw(_("Invalid status transition: {0}").format(status))
 	jo = frappe.get_doc("Job Order P2", name)
+	jo.check_permission("submit")
 	if jo.docstatus != 1:
 		frappe.throw(_("Only submitted Job Order P2 can transition status"))
 	jo.db_set("status", status)
@@ -470,42 +1008,158 @@ def stop_job_order(name, status):
 
 
 @frappe.whitelist()
-def get_sales_orders_for_jo(production_item, customer=None, from_date=None, to_date=None):
-	"""Return open Sales Order Items matching a given MC Component."""
+def get_operations_for_item(production_item):
+	"""Return Master Card Process operations for a single MC Component."""
+	frappe.has_permission("Job Order P2", "read", throw=True)
+	frappe.has_permission("Master Card", "read", throw=True)
 	if not production_item:
 		frappe.throw(_("MC Component is required"))
-	filters = ["so.docstatus = 1", "so.status NOT IN ('Stopped','Closed','Cancelled')"]
-	values = []
-	filters.append("soi.item_code = %s")
-	values.append(production_item)
-	filters.append("(soi.qty - IFNULL(soi.delivered_qty, 0)) > 0")
-	if customer:
-		filters.append("so.customer = %s")
-		values.append(customer)
-	if from_date:
-		filters.append("so.transaction_date >= %s")
-		values.append(from_date)
-	if to_date:
-		filters.append("so.transaction_date <= %s")
-		values.append(to_date)
-	where = " AND ".join(filters)
-	rows = frappe.db.sql(
+	return get_master_card_operations_for_item(production_item)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_so_query_for_production_item(doctype, txt, searchfield, start, page_len, filters):
+	"""Link query: return submitted, active Sales Orders that have a Packed Item
+	matching the given production_item. Used by the Get Items From picker when
+	MC Component is already set so users only see relevant SOs."""
+	# production_item may come from get_query_filters or from the mc_no setter value
+	production_item = filters.get("production_item") or filters.get("mc_no") or ""
+	customer = filters.get("customer") or ""
+
+	# Build optional customer clause (parametrised — no injection risk)
+	customer_clause = "AND so.customer = %(customer)s" if customer else ""
+
+	return frappe.db.sql(
 		f"""
-		SELECT
-		    so.name AS sales_order,
-		    soi.name AS sales_order_item,
-		    soi.item_code,
-		    (soi.qty - IFNULL(soi.delivered_qty, 0)) AS open_qty,
-		    soi.delivery_date,
-		    so.customer,
-		    so.status AS so_status,
-		    so.transaction_date
-		FROM `tabSales Order Item` soi
-		JOIN `tabSales Order` so ON so.name = soi.parent
-		WHERE {where}
-		ORDER BY soi.delivery_date ASC, so.name ASC
+		SELECT DISTINCT so.name, pi.item_code AS mc_no, so.customer, so.transaction_date
+		FROM `tabSales Order` so
+		JOIN `tabPacked Item` pi ON pi.parent = so.name
+		WHERE so.docstatus = 1
+		  AND so.status NOT IN ('Stopped', 'Closed', 'Cancelled')
+		  AND pi.item_code = %(production_item)s
+		  {customer_clause}
+		  AND (so.name LIKE %(txt)s OR so.customer LIKE %(txt)s)
+		ORDER BY so.transaction_date DESC
+		LIMIT %(page_len)s OFFSET %(start)s
 		""",
-		tuple(values),
-		as_dict=True,
+		{
+			"production_item": production_item,
+			"customer": customer,
+			"txt": f"%{txt}%",
+			"page_len": page_len,
+			"start": start,
+		},
+		as_dict=1,
 	)
-	return rows
+
+
+@frappe.whitelist()
+def get_items_from_so_for_jop2(source_name, target_doc=None, kwargs=None):
+	"""Mapper for map_current_doc with allow_child_item_selection: true.
+
+	Adds Packed Item rows from a Sales Order to the JO P2's sales_order_items table.
+	Silently filters by production_item (skip non-matching rows). Respects
+	allow_child_item_selection via kwargs.filtered_children.
+
+	Args:
+		source_name: the Sales Order name.
+		target_doc: the JO P2 document (dict or Document object).
+		kwargs: optional dict with filtered_children list (from allow_child_item_selection).
+
+	Returns:
+		The mutated target_doc.
+	"""
+	frappe.has_permission("Job Order P2", "read", throw=True)
+	frappe.has_permission("Sales Order", "read", throw=True)
+
+	if kwargs is None:
+		kwargs = {}
+
+	if target_doc is None:
+		target_doc = frappe.new_doc("Job Order P2")
+	elif isinstance(target_doc, str):
+		# map_docs passes target_doc as a raw JSON string
+		target_doc = frappe.get_doc(json.loads(target_doc))
+	elif isinstance(target_doc, dict):
+		target_doc = frappe.get_doc(target_doc)
+
+	source = frappe.get_doc("Sales Order", source_name)
+	if source.docstatus != 1:
+		return target_doc
+
+	# Extract production_item and exclude_job_order from target
+	production_item = target_doc.get("production_item")
+	exclude_job_order = (
+		target_doc.get("name") if target_doc.get("docstatus") == 0 else None
+	)
+
+	# Get filtered_children if in child-selection mode (user selected specific Packed Items)
+	filtered_children = kwargs.get("filtered_children") or []
+
+	# Ensure sales_order_items exists
+	if not target_doc.sales_order_items:
+		target_doc.sales_order_items = []
+
+	# Walk packed_items, applying filters
+	rows_added = 0
+	first_item_code = None
+	for pi_row in source.packed_items or []:
+		# Silent filter 1: production_item mismatch
+		if production_item and pi_row.item_code != production_item:
+			continue
+
+		# Silent filter 2: child-selection mode and not in filtered list
+		if filtered_children and pi_row.name not in filtered_children:
+			continue
+
+		# Calculate open quantity
+		open_qty = flt(
+			get_so_item_available_qty(
+				pi_row.name, exclude_job_order=exclude_job_order
+			)
+		)
+		if open_qty <= 0:
+			continue
+
+		# Check if already in target (avoid duplicates)
+		existing = [
+			r for r in target_doc.sales_order_items
+			if r.sales_order == source_name
+			and r.sales_order_item == pi_row.name
+		]
+		if existing:
+			continue
+
+		# Resolve delivery_date from parent Sales Order Item
+		details = get_so_line_details(pi_row.name) or frappe._dict()
+
+		# Add to target's sales_order_items
+		target_doc.append("sales_order_items", {
+			"sales_order": source_name,
+			"sales_order_item": pi_row.name,
+			"item_code": pi_row.item_code,
+			"qty": open_qty,
+			"delivery_date": details.get("delivery_date"),
+			"customer": source.customer,
+			"so_status": source.status,
+		})
+		if first_item_code is None:
+			first_item_code = pi_row.item_code
+		rows_added += 1
+
+	# Auto-populate MC Component from the first added row's item_code when not already set
+	if rows_added > 0 and first_item_code and not target_doc.get("production_item"):
+		target_doc.production_item = first_item_code
+
+	if rows_added == 0:
+		item_label = production_item or _("any item")
+		frappe.msgprint(
+			_("No open Packed Items found for <b>{0}</b> in {1}. "
+			  "Either the item is not in this Sales Order's packed items, "
+			  "or the full quantity is already allocated.").format(item_label, source_name),
+			title=_("No Items Added"),
+			indicator="orange",
+		)
+
+	return target_doc

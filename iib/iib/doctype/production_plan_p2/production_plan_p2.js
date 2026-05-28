@@ -1,4 +1,21 @@
 frappe.ui.form.on("Production Plan P2", {
+	setup(frm) {
+		frm.set_query("item_code", () => ({
+			filters: { item_group: "Component" },
+		}));
+		frm.set_query("item_code", "po_items", () => ({
+			filters: { item_group: "Component" },
+		}));
+		frm.set_query("production_section", "section_assignments", (doc, cdt, cdn) => {
+			const row = locals[cdt][cdn];
+			const filters = { is_group: 0 };
+			if (row.section) {
+				filters["parent_iib_production_section"] = row.section;
+			}
+			return { filters };
+		});
+	},
+
 	refresh(frm) {
 		ensure_items_table_is_optional(frm);
 		set_status_indicator(frm);

@@ -2,11 +2,18 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Master Card", {
+	setup(frm) {
+		set_process_queries(frm);
+	},
+
 	refresh(frm) {
 		frm.set_df_property("item_code", "read_only", 1);
 		frm.trigger("render_mc_badge");
 		frm.trigger("render_copy_buttons");
 		frm.trigger("add_action_buttons");
+		apply_price_currency_formatters(frm);
+		calculate_price_rows(frm);
+		render_price_items_summary(frm);
 
 		// Force correct column definitions on the processes grid.
 		// Browser localStorage may cache an older schema, so patch docfields
@@ -127,6 +134,25 @@ frappe.ui.form.on("Master Card", {
 		}
 	},
 
+	processes_add(frm, cdt, cdn) {
+		set_process_component_from_tab(frm, cdt, cdn);
+		set_process_sequence(frm, cdt, cdn);
+	},
+
+	price_items_add(frm, cdt, cdn) {
+		calculate_price_row(frm, cdt, cdn);
+	},
+
+	price_items_remove(frm) {
+		render_price_items_summary(frm);
+	},
+
+	currency(frm) {
+		apply_price_currency_formatters(frm);
+		render_price_items_summary(frm);
+		frm.refresh_field("price_items");
+	},
+
 });
 
 // ------------------------------------------------------------------
@@ -152,11 +178,55 @@ frappe.ui.form.on("Master Card Item", {
 
 		// Re-render tabs so the new component letter appears
 		frm.trigger("render_process_tabs");
+		render_price_items_summary(frm);
+	},
+
+	qty(frm) {
+		render_price_items_summary(frm);
 	},
 
 	items_remove(frm) {
 		// Re-render tabs after a component row is deleted
 		frm.trigger("render_process_tabs");
+		render_price_items_summary(frm);
+	},
+});
+
+frappe.ui.form.on("Master Card Price Item", {
+	moq_qty(frm, cdt, cdn) {
+		calculate_price_row(frm, cdt, cdn);
+	},
+
+	component(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		let component = (row.component || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 1);
+		frappe.model.set_value(cdt, cdn, "component", component).then(() => {
+			render_price_items_summary(frm);
+		});
+	},
+
+	material(frm, cdt, cdn) {
+		calculate_price_row(frm, cdt, cdn);
+	},
+
+	labour(frm, cdt, cdn) {
+		calculate_price_row(frm, cdt, cdn);
+	},
+
+	profit(frm, cdt, cdn) {
+		calculate_price_row(frm, cdt, cdn);
+	},
+
+	ext_profit(frm, cdt, cdn) {
+		calculate_price_row(frm, cdt, cdn);
+	},
+
+	price_items_add(frm, cdt, cdn) {
+		calculate_price_row(frm, cdt, cdn);
+	},
+
+	price_items_remove(frm) {
+		render_price_items_summary(frm);
 	},
 });
 
@@ -223,28 +293,25 @@ function filter_processes_grid(frm, letter) {
 
 // ------------------------------------------------------------------
 // Ensure processes grid always has the correct column definitions.
-// Browser localStorage may cache a stale schema (missing machine/remarks).
+// Browser localStorage may cache a stale schema, so the grid meta is patched
+// in-place before Frappe lays out the child table.
 // Fix: patch frappe.meta directly so grid.setup_fields() re-reads correctly.
 // columns must sum to ≤ 10:
-//   component(1)+sequence(1)+section(2)+est_time(1)+machine(2)+remarks(3) = 10
+//   component(1)+sequence(1)+section(3)+est_time(2)+description(3) = 10
 // ------------------------------------------------------------------
 
 const PROCESS_GRID_COLUMNS = [
-	{ fieldname: "component",    label: "Comp",                fieldtype: "Data", in_list_view: 1, columns: 1, reqd: 1, parent: "Master Card Process" },
+	{ fieldname: "component",    label: "Comp",                fieldtype: "Data", in_list_view: 1, columns: 1, reqd: 1, read_only: 1, parent: "Master Card Process" },
 	{ fieldname: "sequence",     label: "Seq",                 fieldtype: "Int",  in_list_view: 1, columns: 1, reqd: 1, parent: "Master Card Process" },
-	{ fieldname: "section",      label: "Section",             fieldtype: "Link", in_list_view: 1, columns: 2, reqd: 1, options: "IIB Production Section", parent: "Master Card Process" },
-	{ fieldname: "est_time_mins",label: "Est Time (mins)",     fieldtype: "Int",  in_list_view: 1, columns: 1, parent: "Master Card Process" },
-	{ fieldname: "machine",      label: "Machine/Workstation", fieldtype: "Data", in_list_view: 1, columns: 2, parent: "Master Card Process" },
-	{ fieldname: "remarks",      label: "Remarks",             fieldtype: "Data", in_list_view: 1, columns: 3, parent: "Master Card Process" },
-	{ fieldname: "description",  label: "Description",         fieldtype: "Data", in_list_view: 0, parent: "Master Card Process" },
+	{ fieldname: "section",      label: "Section Group",       fieldtype: "Link", in_list_view: 1, columns: 3, reqd: 1, options: "IIB Production Section", parent: "Master Card Process" },
+	{ fieldname: "est_time_mins",label: "Est Time (mins)",     fieldtype: "Int",  in_list_view: 1, columns: 2, parent: "Master Card Process" },
+	{ fieldname: "description",  label: "Description",         fieldtype: "Data", in_list_view: 1, columns: 3, parent: "Master Card Process" },
+	{ fieldname: "remarks",      label: "Remarks",             fieldtype: "Data", in_list_view: 0, parent: "Master Card Process" },
 ];
 
 function ensure_process_grid_columns(frm) {
 	const DT = "Master Card Process";
-
-	// Check if already correct (machine present with in_list_view=1)
 	const map = (frappe.meta.docfield_map || {})[DT] || {};
-	if (map["machine"] && map["machine"].in_list_view) return;
 
 	// 1. Patch frappe.meta.docfield_map (keyed by fieldname)
 	frappe.provide("frappe.meta.docfield_map." + DT);
@@ -256,19 +323,26 @@ function ensure_process_grid_columns(frm) {
 			frappe.meta.docfield_map[DT][col.fieldname] = Object.assign({}, col);
 		}
 	});
+	if (map.machine) {
+		Object.assign(map.machine, { hidden: 1, in_list_view: 0, reqd: 0 });
+	}
 
 	// 2. Patch frappe.meta.docfield_list (ordered array)
 	if (!frappe.meta.docfield_list) frappe.meta.docfield_list = {};
 	const list = frappe.meta.docfield_list[DT] || [];
-	PROCESS_GRID_COLUMNS.forEach((col) => {
-		const idx = list.findIndex((f) => f.fieldname === col.fieldname);
-		if (idx >= 0) {
-			Object.assign(list[idx], col);
-		} else {
-			list.push(Object.assign({}, col));
-		}
+	const ordered = PROCESS_GRID_COLUMNS.map((col) => {
+		const existing = list.find((f) => f.fieldname === col.fieldname);
+		return Object.assign(existing || {}, col);
 	});
-	frappe.meta.docfield_list[DT] = list;
+	list
+		.filter((f) => !PROCESS_GRID_COLUMNS.some((col) => col.fieldname === f.fieldname))
+		.forEach((f) => {
+			if (f.fieldname === "machine") {
+				Object.assign(f, { hidden: 1, in_list_view: 0, reqd: 0 });
+			}
+			ordered.push(f);
+		});
+	frappe.meta.docfield_list[DT] = ordered;
 
 	// 3. Patch locals['DocType'] so frappe.get_meta() is consistent
 	const meta = frappe.get_meta(DT);
@@ -282,6 +356,10 @@ function ensure_process_grid_columns(frm) {
 				meta.fields.push(Object.assign({}, col));
 			}
 		});
+		const machine = (meta.fields || []).find((x) => x.fieldname === "machine");
+		if (machine) {
+			Object.assign(machine, { hidden: 1, in_list_view: 0, reqd: 0 });
+		}
 	}
 
 	// 4. Re-run setup_fields() so grid re-reads from the now-correct meta,
@@ -291,6 +369,168 @@ function ensure_process_grid_columns(frm) {
 	if (!grid) return;
 	grid.setup_fields();
 	grid.make_head();
+}
+
+function set_process_queries(frm) {
+	frm.set_query("section", "processes", () => ({
+		filters: {
+			is_group: 1,
+			disabled: 0,
+		},
+	}));
+}
+
+function calculate_price_rows(frm) {
+	apply_price_currency_formatters(frm);
+	(frm.doc.price_items || []).forEach((row) => {
+		calculate_price_row(frm, row.doctype, row.name, false);
+	});
+	render_price_items_summary(frm);
+}
+
+function calculate_price_row(frm, cdt, cdn, render = true) {
+	const row = locals[cdt] && locals[cdt][cdn];
+	if (!row) return;
+
+	const total =
+		flt(row.material) + flt(row.labour) + flt(row.profit) + flt(row.ext_profit);
+	frappe.model.set_value(cdt, cdn, "total", total);
+
+	if (render) {
+		render_price_items_summary(frm);
+	}
+}
+
+function render_price_items_summary(frm) {
+	const field = frm.fields_dict.price_items_html;
+	if (!field) return;
+
+	const rows = (frm.doc.price_items || []).slice().sort((a, b) => {
+		const moqDiff = flt(a.moq_qty) - flt(b.moq_qty);
+		if (moqDiff) return moqDiff;
+		return String(a.component || "").localeCompare(String(b.component || ""));
+	});
+
+	if (!rows.length) {
+		field.$wrapper.html(
+			`<p class="text-muted small" style="margin:4px 0 8px">${__(
+				"Add price rows below. Rows are grouped by MOQ quantity."
+			)}</p>`
+		);
+		return;
+	}
+
+	const grouped = rows.reduce((acc, row) => {
+		const moq = flt(row.moq_qty);
+		if (!acc[moq]) acc[moq] = [];
+		acc[moq].push(row);
+		return acc;
+	}, {});
+	const qty_by_component = get_component_qty_map(frm);
+
+	const blocks = Object.keys(grouped)
+		.map((moq) => {
+			const body = grouped[moq]
+				.map((row) => {
+					const component = (row.component || "").toUpperCase().trim();
+					const qty = qty_by_component[component] || 1;
+					const set_total = flt(row.total) * qty;
+					return `
+						<tr>
+							<td>${frappe.utils.escape_html(component)}</td>
+							<td class="text-right">${format_price_currency(row.material, frm.doc.currency)}</td>
+							<td class="text-right">${format_price_currency(row.labour, frm.doc.currency)}</td>
+							<td class="text-right">${format_price_currency(row.profit, frm.doc.currency)}</td>
+							<td class="text-right">${format_price_currency(row.ext_profit, frm.doc.currency)}</td>
+							<td class="text-right">${format_qty(qty)}</td>
+							<td class="text-right">${format_price_currency(row.total, frm.doc.currency)}</td>
+							<td class="text-right">${format_price_currency(set_total, frm.doc.currency)}</td>
+						</tr>`;
+				})
+				.join("");
+
+			const total = grouped[moq].reduce((sum, row) => {
+				const component = (row.component || "").toUpperCase().trim();
+				const qty = qty_by_component[component] || 1;
+				return sum + flt(row.total) * qty;
+			}, 0);
+			return `
+				<div style="margin:0 0 12px">
+					<div class="text-muted small" style="margin-bottom:4px">${__("MOQ Qty")}: <strong>${moq}</strong> &nbsp; ${__(
+						"Total Set Price"
+					)}: <strong>${format_price_currency(total, frm.doc.currency)}</strong></div>
+					<div class="table-responsive">
+						<table class="table table-bordered table-condensed" style="margin-bottom:0">
+							<thead>
+								<tr>
+									<th>${__("Comp")}</th>
+									<th class="text-right">${__("Material")}</th>
+									<th class="text-right">${__("Labour")}</th>
+									<th class="text-right">${__("Profit")}</th>
+									<th class="text-right">${__("Ext Profit")}</th>
+									<th class="text-right">${__("Qty")}</th>
+									<th class="text-right">${__("Unit Total")}</th>
+									<th class="text-right">${__("Set Total")}</th>
+								</tr>
+							</thead>
+							<tbody>${body}</tbody>
+						</table>
+					</div>
+				</div>`;
+		})
+		.join("");
+
+	field.$wrapper.html(blocks);
+}
+
+function get_component_qty_map(frm) {
+	return (frm.doc.items || []).reduce((acc, row) => {
+		const component = (row.component || "").toUpperCase().trim();
+		if (component) {
+			acc[component] = flt(row.qty) || 1;
+		}
+		return acc;
+	}, {});
+}
+
+function format_qty(value) {
+	const qty = flt(value);
+	return Number.isInteger(qty) ? String(qty) : String(qty);
+}
+
+function apply_price_currency_formatters(frm) {
+	const map = (frappe.meta.docfield_map || {})["Master Card Price Item"];
+	if (!map) return;
+
+	["material", "labour", "profit", "ext_profit", "total"].forEach((fieldname) => {
+		if (!map[fieldname]) return;
+		map[fieldname].formatter = (value) => format_price_currency(value, frm.doc.currency);
+	});
+}
+
+function format_price_currency(value, currency) {
+	const formatted = format_currency(value, currency, 4);
+	const symbol = get_price_currency_symbol(currency);
+
+	if (!currency || !symbol || symbol === currency) {
+		return formatted;
+	}
+
+	return formatted.replace(new RegExp(`^${escape_regex(currency)}\\s*`), `${symbol} `);
+}
+
+function get_price_currency_symbol(currency) {
+	const symbols = {
+		SGD: "S$",
+		USD: "$",
+		IDR: "Rp",
+		MYR: "RM",
+	};
+	return symbols[currency] || get_currency_symbol(currency);
+}
+
+function escape_regex(value) {
+	return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function set_process_sequence(frm, cdt, cdn) {

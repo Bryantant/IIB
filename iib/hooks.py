@@ -155,10 +155,8 @@ doc_events = {
 		"on_submit": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
 		"on_cancel": "iib.iib.doctype.custom_production_plan.custom_production_plan.sync_from_purchase_order",
 	},
-	"Stock Entry": {
-		"on_submit": "iib.iib.doctype.job_order_p2.job_order_p2_hooks.on_stock_entry_change",
-		"on_cancel": "iib.iib.doctype.job_order_p2.job_order_p2_hooks.on_stock_entry_change",
-	},
+	# WIP to FG cascades to JO P2 produced_qty via the doctype's own on_submit/on_cancel
+	# (no separate hook needed — handled inside job_order_p2_wip_to_fg.py)
 }
 
 # Scheduled Tasks

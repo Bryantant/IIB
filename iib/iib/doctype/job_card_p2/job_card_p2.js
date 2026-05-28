@@ -1,4 +1,14 @@
 frappe.ui.form.on("Job Card P2", {
+	setup(frm) {
+		frm.set_query("section", () => ({
+			query:
+				"iib.iib.doctype.iib_production_section.iib_production_section.get_section_leaf_query",
+			filters: {
+				section_group: frm.doc.section_group || null,
+			},
+		}));
+	},
+
 	refresh(frm) {
 		set_status_indicator(frm);
 	},

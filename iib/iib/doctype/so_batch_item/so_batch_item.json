@@ -59,7 +59,8 @@
    "fieldname": "rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Rate"
+   "label": "Rate",
+   "precision": "4"
   },
   {
    "fieldname": "line_no",

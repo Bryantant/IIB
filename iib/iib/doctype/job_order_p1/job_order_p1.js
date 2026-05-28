@@ -1,9 +1,60 @@
 frappe.ui.form.on("Job Order P1", {
+	setup(frm) {
+		// Filter Sales Order link in child rows to open (submitted, not closed) SOs
+		frm.set_query("sales_order", "items", () => ({
+			filters: {
+				docstatus: 1,
+				status: ["not in", ["Closed", "Cancelled", "Completed"]],
+			},
+		}));
+		// Filter item_code to Component items that belong to the selected SO in
+		// the same row (bundles are expanded to their packed components).
+		// Falls back to all Component stock items when no SO is set.
+		frm.set_query("item_code", "items", (doc, cdt, cdn) => {
+			const row = locals[cdt][cdn];
+			if (row.sales_order) {
+				return {
+					query: "iib.iib.doctype.job_order_p1.job_order_p1.get_so_component_items",
+					filters: { sales_order: row.sales_order },
+				};
+			}
+			return { filters: { is_stock_item: 1, item_group: "Component" } };
+		});
+	},
 	refresh(frm) {
 		set_status_indicator(frm);
 		add_get_items_button(frm);
 		add_create_receipt_button(frm);
 		add_status_buttons(frm);
+	},
+});
+
+// ---------------------------------------------------------------------------
+// Child-row events: manual entry helpers
+// ---------------------------------------------------------------------------
+
+frappe.ui.form.on("Job Order P1 Item", {
+	// When SO changes, clear dependent fields so filters reapply cleanly
+	sales_order(frm, cdt, cdn) {
+		frappe.model.set_value(cdt, cdn, "sales_order_item", null);
+		frappe.model.set_value(cdt, cdn, "item_code", null);
+	},
+
+	// When item_code is selected, auto-populate sales_order_item by looking up
+	// which SO Item row on the selected Sales Order owns this component item.
+	// Handles both direct SO items and packed components of bundle SO items.
+	item_code(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (!row.item_code || !row.sales_order) return;
+		frappe.call({
+			method: "iib.iib.doctype.job_order_p1.job_order_p1.get_so_item_for_component",
+			args: { sales_order: row.sales_order, item_code: row.item_code },
+			callback(r) {
+				if (r.message) {
+					frappe.model.set_value(cdt, cdn, "sales_order_item", r.message);
+				}
+			},
+		});
 	},
 });
 
@@ -19,14 +70,40 @@ function set_status_indicator(frm) {
 	frm.page.set_indicator(frm.doc.status, colors[frm.doc.status] || "blue");
 }
 
+// ---------------------------------------------------------------------------
+// Get Items From → Sales Order
+// ---------------------------------------------------------------------------
+
 function add_get_items_button(frm) {
 	if (frm.doc.docstatus !== 0) return;
 	frm.add_custom_button(
 		__("Sales Order"),
-		() => open_so_picker(frm),
+		() => {
+			erpnext.utils.map_current_doc({
+				method: "iib.iib.doctype.job_order_p1.job_order_p1.get_items_from_so_for_jop1",
+				source_doctype: "Sales Order",
+				target: frm,
+				date_field: "transaction_date",
+				setters: {
+					customer: null,
+					transaction_date: null,
+				},
+				get_query_filters: {
+					docstatus: 1,
+					status: ["not in", ["Closed", "Cancelled", "Completed"]],
+				},
+				allow_child_item_selection: true,
+				child_fieldname: "items",
+				child_columns: ["item_code", "item_name", "qty", "custom_jop1_qty"],
+			});
+		},
 		__("Get Items From")
 	);
 }
+
+// ---------------------------------------------------------------------------
+// Create Receipt button
+// ---------------------------------------------------------------------------
 
 function add_create_receipt_button(frm) {
 	if (frm.doc.docstatus !== 1) return;
@@ -45,6 +122,10 @@ function add_create_receipt_button(frm) {
 	frm.page.set_inner_btn_group_as_primary(__("Create"));
 }
 
+// ---------------------------------------------------------------------------
+// Status buttons
+// ---------------------------------------------------------------------------
+
 function add_status_buttons(frm) {
 	if (frm.doc.docstatus !== 1) return;
 	if (frm.doc.status === "Closed") {
@@ -60,50 +141,6 @@ function add_status_buttons(frm) {
 			__("Status")
 		);
 	}
-}
-
-function open_so_picker(frm) {
-	new frappe.ui.form.MultiSelectDialog({
-		doctype: "Sales Order",
-		target: frm,
-		setters: { customer: null, transaction_date: null },
-		add_filters_group: 1,
-		date_field: "transaction_date",
-		get_query() {
-			return {
-				filters: {
-					docstatus: 1,
-					status: ["not in", ["Closed", "Completed", "Cancelled"]],
-				},
-			};
-		},
-		action(selected) {
-			const sales_orders = selected;
-			if (!sales_orders.length) return;
-			frappe.call({
-				method: "iib.iib.doctype.job_order_p1.job_order_p1.get_so_items_for_jop1",
-				args: { sales_orders },
-				callback(r) {
-					if (!r.message || !r.message.length) {
-						frappe.show_alert({
-							message: __("No open Sales Order lines found"),
-							indicator: "orange",
-						});
-						return;
-					}
-					r.message.forEach((item) => {
-						const row = frm.add_child("items");
-						Object.assign(row, item);
-					});
-					frm.refresh_field("items");
-					frappe.show_alert({
-						message: __("{0} item(s) added", [r.message.length]),
-						indicator: "green",
-					});
-				},
-			});
-		},
-	});
 }
 
 function set_status(frm, status) {

@@ -4,24 +4,68 @@ frappe.ui.form.on("Job Order P2", {
 		frm.set_query("production_item", () => ({
 			filters: { item_group: "Component" },
 		}));
+		frm.set_query("section", "operations", () => ({
+			filters: {
+				is_group: 1,
+				disabled: 0,
+			},
+		}));
+		frm.set_query("production_section", "operations", (doc, cdt, cdn) => {
+			const row = locals[cdt][cdn];
+			return {
+				query:
+					"iib.iib.doctype.iib_production_section.iib_production_section.get_section_leaf_query",
+				filters: {
+					section_group: row.section || null,
+				},
+			};
+		});
+	},
+
+	onload(frm) {
+		ensure_sales_order_items_table_is_optional(frm);
+		remove_blank_so_item_rows(frm);
+		remember_production_item(frm);
 	},
 
 	refresh(frm) {
+		ensure_sales_order_items_table_is_optional(frm);
+		remove_blank_so_item_rows(frm);
+		if (!frm._last_production_item) {
+			remember_production_item(frm);
+		}
 		set_status_indicator(frm);
-		add_get_sales_orders_button(frm);
-		add_set_finish_button(frm);
+		add_get_items_button(frm);
+		add_start_button(frm);
+		add_view_button(frm);
 		add_stop_button(frm);
 		add_close_button(frm);
 		add_return_components_button(frm);
 	},
 
 	production_item(frm) {
-		// On MC Component change while draft: clear operations and trigger re-resolve via save
+		// On a real user change, keep only SO rows that belong to the chosen MC Component.
+		// The Sales Order Create path preloads matching rows before the form opens.
 		if (frm.doc.docstatus !== 0) return;
-		frm.clear_table("operations");
+		if (frm._setting_production_item_from_so_picker) return;
+
+		const previous_item = frm._last_production_item;
+		const production_item = frm.doc.production_item;
+		if (previous_item && previous_item !== production_item) {
+			frm.clear_table("operations");
+			frm.refresh_field("operations");
+		}
+		filter_sales_order_rows_for_item(frm, production_item);
+		populate_operations_from_item(frm, frm.doc.production_item);
+		remember_production_item(frm);
+	},
+});
+
+frappe.ui.form.on("Job Order P2 Operation", {
+	section(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		row.production_section = "";
 		frm.refresh_field("operations");
-		frm.clear_table("sales_order_items");
-		frm.refresh_field("sales_order_items");
 	},
 });
 
@@ -42,166 +86,188 @@ function set_status_indicator(frm) {
 	}
 }
 
-// ---- Get Sales Orders dialog (Draft only) ----
+// ---------------------------------------------------------------------------
+// Get Items From → Sales Order  (erpnext.utils.map_current_doc with checkbox)
+// ---------------------------------------------------------------------------
+//
+// Delivery Note pattern: allows user to toggle "Select Sales Order Item" checkbox
+// to switch between parent (Sales Order) and child (Packed Item) selection modes.
+// No MC Component requirement — filter applied server-side.
 
-function add_get_sales_orders_button(frm) {
+function add_get_items_button(frm) {
 	if (frm.doc.docstatus !== 0) return;
-	frm.add_custom_button(__("Get Sales Orders"), () => open_so_picker(frm));
-}
-
-function open_so_picker(frm) {
-	if (!frm.doc.production_item) {
-		frappe.show_alert({
-			message: __("Pick an MC Component first"),
-			indicator: "orange",
-		});
-		return;
-	}
-	const dialog = new frappe.ui.Dialog({
-		title: __("Get Sales Orders for {0}", [frm.doc.production_item]),
-		fields: [
-			{ fieldtype: "Link", label: __("Customer"), fieldname: "customer", options: "Customer" },
-			{ fieldtype: "Column Break" },
-			{ fieldtype: "Date", label: __("SO From Date"), fieldname: "from_date" },
-			{ fieldtype: "Date", label: __("SO To Date"), fieldname: "to_date" },
-			{ fieldtype: "Section Break" },
-			{ fieldtype: "HTML", fieldname: "results_html" },
-		],
-		primary_action_label: __("Add Selected"),
-		primary_action(values) {
-			const $rows = dialog.$wrapper.find(".jo-p2-so-row input[type=checkbox]:checked");
-			if (!$rows.length) {
-				frappe.show_alert({
-					message: __("No rows selected"),
+	frm.add_custom_button(
+		__("Sales Order"),
+		() => {
+			// MC Component must be set first — same pattern as Sales Invoice requiring Customer
+			if (!frm.doc.production_item) {
+				frappe.msgprint({
+					title: __("MC Component Required"),
+					message: __(
+						"Please set the <b>MC Component</b> before fetching from Sales Order."
+					),
 					indicator: "orange",
 				});
 				return;
 			}
-			const existing = new Set(
-				(frm.doc.sales_order_items || []).map((r) => `${r.sales_order}|${r.sales_order_item}`)
-			);
-			let added = 0;
-			$rows.each(function () {
-				const data = JSON.parse($(this).attr("data-row"));
-				const key = `${data.sales_order}|${data.sales_order_item}`;
-				if (existing.has(key)) return;
-				const row = frm.add_child("sales_order_items");
-				row.sales_order = data.sales_order;
-				row.sales_order_item = data.sales_order_item;
-				row.item_code = data.item_code;
-				row.qty = data.open_qty;
-				row.delivery_date = data.delivery_date;
-				row.customer = data.customer;
-				row.so_status = data.so_status;
-				existing.add(key);
-				added++;
-			});
-			frm.refresh_field("sales_order_items");
-			// Auto-set qty = sum of newly populated rows
-			let total = 0;
-			(frm.doc.sales_order_items || []).forEach((r) => {
-				total += parseFloat(r.qty || 0);
-			});
-			frm.set_value("qty", total);
-			dialog.hide();
-			frappe.show_alert({
-				message: __("{0} row(s) added", [added]),
-				indicator: "green",
+
+			// Setters as an array so we can define custom fields not on the Sales Order schema:
+			//   • MC No  — read-only display of the current MC Component being filtered
+			//   • Customer — optional link filter to narrow SOs by customer
+			erpnext.utils.map_current_doc({
+				method: "iib.iib.doctype.job_order_p2.job_order_p2.get_items_from_so_for_jop2",
+				source_doctype: "Sales Order",
+				target: frm,
+				date_field: "transaction_date",
+				setters: [
+					{
+						fieldtype: "Data",
+						label: __("MC No"),
+						fieldname: "mc_no",
+						read_only: 1,
+						default: frm.doc.production_item,
+					},
+					{
+						fieldtype: "Link",
+						label: __("Customer"),
+						fieldname: "customer",
+						options: "Customer",
+					},
+				],
+				allow_child_item_selection: true,
+				child_fieldname: "packed_items",
+				child_columns: ["item_code", "item_name", "qty", "custom_wip_quantity"],
+				// Custom query: only SOs containing a packed item matching production_item
+				get_query_method:
+					"iib.iib.doctype.job_order_p2.job_order_p2.get_so_query_for_production_item",
+				get_query_filters: { production_item: frm.doc.production_item },
 			});
 		},
-	});
-
-	// Search button to (re)fetch results
-	const $search_btn = $(
-		`<button class="btn btn-sm btn-default" style="margin-bottom:10px">${__("Search")}</button>`
+		__("Get Items From")
 	);
-	dialog.$wrapper.find(".modal-body").prepend($search_btn);
-	$search_btn.on("click", () => run_so_search(frm, dialog));
-
-	dialog.show();
-	// Run initial search with no filters
-	run_so_search(frm, dialog);
 }
 
-function run_so_search(frm, dialog) {
-	const v = dialog.get_values(true) || {};
-	frappe.call({
-		method: "iib.iib.doctype.job_order_p2.job_order_p2.get_sales_orders_for_jo",
-		args: {
-			production_item: frm.doc.production_item,
-			customer: v.customer || null,
-			from_date: v.from_date || null,
-			to_date: v.to_date || null,
-		},
-		callback(r) {
-			render_so_results(dialog, r.message || []);
-		},
-	});
+function ensure_sales_order_items_table_is_optional(frm) {
+	if (frm.fields_dict.sales_order_items) {
+		frm.fields_dict.sales_order_items.df.reqd = 0;
+	}
+	frm.set_df_property("sales_order_items", "reqd", 0);
 }
 
-function render_so_results(dialog, rows) {
-	const $wrap = dialog.fields_dict.results_html.$wrapper;
-	if (!rows.length) {
-		$wrap.html(
-			`<div class="text-muted">${__("No open Sales Order Items found")}</div>`
-		);
+function remove_blank_so_item_rows(frm) {
+	const rows = frm.doc.sales_order_items || [];
+	const rows_to_keep = rows.filter((row) => !is_blank_so_item_row(row));
+	if (rows_to_keep.length === rows.length) return;
+	frm.doc.sales_order_items = rows_to_keep;
+	frm.refresh_field("sales_order_items");
+}
+
+function filter_sales_order_rows_for_item(frm, production_item) {
+	let rows = frm.doc.sales_order_items || [];
+	rows = rows.filter((row) => !is_blank_so_item_row(row));
+	if (production_item) {
+		rows = rows.filter((row) => !row.item_code || row.item_code === production_item);
+	}
+	if (rows.length === (frm.doc.sales_order_items || []).length) return;
+	frm.doc.sales_order_items = rows;
+	frm.refresh_field("sales_order_items");
+}
+
+function is_blank_so_item_row(row) {
+	return (
+		!row.sales_order &&
+		!row.sales_order_item &&
+		!row.item_code &&
+		!row.delivery_date &&
+		!row.customer &&
+		!row.so_status &&
+		!flt(row.qty)
+	);
+}
+
+function remember_production_item(frm) {
+	frm._last_production_item = frm.doc.production_item || null;
+}
+
+function has_nonblank_operation_rows(frm) {
+	return (frm.doc.operations || []).some((row) => row.sequence || row.section);
+}
+
+async function populate_operations_from_item(frm, production_item) {
+	if (!production_item || frm.doc.docstatus !== 0 || has_nonblank_operation_rows(frm)) {
 		return;
 	}
-	const html = [
-		`<table class="table table-bordered table-sm" style="font-size:12px">`,
-		`<thead><tr>
-			<th style="width:30px"><input type="checkbox" class="jo-p2-so-all"></th>
-			<th>${__("Sales Order")}</th>
-			<th>${__("Customer")}</th>
-			<th>${__("Open Qty")}</th>
-			<th>${__("Delivery Date")}</th>
-			<th>${__("Status")}</th>
-		</tr></thead><tbody>`,
-	];
-	rows.forEach((row) => {
-		html.push(
-			`<tr class="jo-p2-so-row">
-				<td><input type="checkbox" data-row='${JSON.stringify(row).replace(/'/g, "&#39;")}'></td>
-				<td>${row.sales_order}</td>
-				<td>${row.customer || ""}</td>
-				<td>${row.open_qty}</td>
-				<td>${row.delivery_date || ""}</td>
-				<td>${row.so_status || ""}</td>
-			</tr>`
-		);
+	const r = await frappe.call({
+		method: "iib.iib.doctype.job_order_p2.job_order_p2.get_operations_for_item",
+		args: { production_item },
 	});
-	html.push(`</tbody></table>`);
-	$wrap.html(html.join(""));
-	$wrap.find(".jo-p2-so-all").on("change", function () {
-		$wrap.find(".jo-p2-so-row input[type=checkbox]").prop("checked", this.checked);
+	const data = r.message || {};
+	if (data.master_card) {
+		await frm.set_value("master_card", data.master_card);
+	}
+	if (!data.operations || !data.operations.length) {
+		return;
+	}
+	frm.clear_table("operations");
+	data.operations.forEach((operation) => {
+		const row = frm.add_child("operations");
+		row.sequence = operation.sequence;
+		row.section = operation.section;
+		row.production_section = operation.production_section || "";
+		row.est_time_mins = operation.est_time_mins;
+		row.description = operation.description;
+		row.status = operation.status || "Pending";
+		row.completed_qty = operation.completed_qty || 0;
 	});
+	frm.refresh_field("operations");
 }
 
-// ---- Set Finish button (WIP -> FG) ----
+// ---- Start button (auto-create + submit RM to WIP in background) ----
 
-function add_set_finish_button(frm) {
+function add_start_button(frm) {
 	if (frm.doc.docstatus !== 1) return;
-	if (["Completed", "Cancelled", "Stopped", "Closed"].includes(frm.doc.status)) return;
-	if (flt(frm.doc.produced_qty) >= flt(frm.doc.qty)) return;
-	frm.add_custom_button(
-		__("Set Finish (WIP → FG)"),
-		() => {
-			frappe.call({
-				method:
-					"iib.iib.doctype.job_order_p2.job_order_p2.make_finish_stock_entry",
-				args: { source_name: frm.doc.name },
-				freeze: true,
-				freeze_message: __("Building Stock Entry..."),
-				callback(r) {
-					if (!r.message) return;
-					frappe.model.sync(r.message);
-					frappe.set_route("Form", "Stock Entry", r.message.name);
-				},
-			});
-		},
-		__("Create")
-	);
-	frm.page.set_inner_btn_group_as_primary(__("Create"));
+	if (frm.doc.status !== "Not Started") return;
+
+	frm.add_custom_button(__("Start"), () => {
+		frappe.show_progress(
+			__("Starting…"),
+			30,
+			100,
+			__("Transferring materials to WIP…")
+		);
+		frappe.call({
+			method: "iib.iib.doctype.job_order_p2.job_order_p2.start_job_order",
+			args: { name: frm.doc.name },
+			callback(r) {
+				frappe.hide_progress();
+				if (r.message) {
+					frappe.show_alert(
+						{
+							message: __("Materials transferred to WIP — {0}", [r.message]),
+							indicator: "green",
+						},
+						6
+					);
+					frm.reload_doc();
+				}
+			},
+			error() {
+				frappe.hide_progress();
+			},
+		});
+	}, null, { "css_class": "btn-primary" });
+}
+
+// ---- View button (dropdown for Stock Ledger) ----
+
+function add_view_button(frm) {
+	if (frm.doc.docstatus !== 1) return;
+	frm.add_custom_button(__("View"), () => {
+		frappe.set_route("query-report", "Stock Ledger", {
+			voucher_type: "Job Order P2 RM to WIP",
+			voucher_no: frm.doc.name,
+		});
+	}, __("View"));
 }
 
 // ---- Return Components button (WIP -> Raw Material) ----

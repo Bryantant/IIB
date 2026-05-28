@@ -3,7 +3,22 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, getdate
+from frappe.utils import flt, getdate, nowdate
+
+
+SO_ITEM_WIP_FIELD = "custom_wip_quantity"
+
+
+def so_item_wip_sql(alias="soi"):
+	if frappe.db.has_column("Sales Order Item", SO_ITEM_WIP_FIELD):
+		return f"IFNULL({alias}.{SO_ITEM_WIP_FIELD}, 0)"
+	return "0"
+
+
+def packed_item_wip_sql(alias="pi"):
+	if frappe.db.has_column("Packed Item", SO_ITEM_WIP_FIELD):
+		return f"IFNULL({alias}.{SO_ITEM_WIP_FIELD}, 0)"
+	return "0"
 
 
 class ProductionPlanP2(Document):
@@ -12,6 +27,10 @@ class ProductionPlanP2(Document):
 		self.compute_totals()
 		if self.docstatus == 0:
 			self.status = "Draft"
+
+	def before_submit(self):
+		if not self.po_items:
+			frappe.throw(_("Items table is empty. Use 'Get Items' to populate before submitting."))
 
 	def on_submit(self):
 		self.db_set("status", "Not Started")
@@ -28,8 +47,6 @@ class ProductionPlanP2(Document):
 
 	def validate_items(self):
 		if not self.po_items:
-			if self.docstatus == 1:
-				frappe.throw(_("Items table is empty. Use 'Get Items' to populate."))
 			return
 		seen = set()
 		for row in self.po_items:
@@ -92,7 +109,6 @@ class ProductionPlanP2(Document):
 		We distribute the JO's produced_qty proportionally to each row's qty,
 		then map each share to the matching po_items row by (sales_order, sales_order_item).
 		"""
-		# Gather submitted JOs for this plan and distribute their produced_qty across SO refs
 		jo_rows = frappe.db.sql(
 			"""
 			SELECT name, produced_qty, qty
@@ -104,6 +120,7 @@ class ProductionPlanP2(Document):
 		)
 
 		produced_by_so_pair = {}
+		produced_by_item = {}
 		for jo in jo_rows:
 			jo_total = flt(jo.qty)
 			jo_produced = flt(jo.produced_qty)
@@ -120,12 +137,24 @@ class ProductionPlanP2(Document):
 				key = (r.sales_order or "", r.sales_order_item or "")
 				produced_by_so_pair[key] = produced_by_so_pair.get(key, 0) + share
 
+		allocation_item_by_pair = {
+			(r.sales_order or "", r.sales_order_item or ""): r.item_code
+			for r in (self.so_item_allocations or [])
+			if r.sales_order_item and r.item_code
+		}
+		for key, produced in produced_by_so_pair.items():
+			item_code = allocation_item_by_pair.get(key)
+			if item_code:
+				produced_by_item[item_code] = produced_by_item.get(item_code, 0) + flt(produced)
+
 		total_planned = 0.0
 		total_produced = 0.0
 		for row in self.po_items:
 			key = (row.sales_order or "", row.sales_order_item or "")
-			produced = flt(produced_by_so_pair.get(key, 0))
-			# Cap at planned_qty (can't fulfill more than planned)
+			if row.sales_order_item:
+				produced = flt(produced_by_so_pair.get(key, 0))
+			else:
+				produced = flt(produced_by_item.get(row.item_code, 0))
 			produced = min(produced, flt(row.planned_qty))
 			pending = max(flt(row.planned_qty) - produced, 0)
 			row.db_set("produced_qty", produced, update_modified=False)
@@ -165,15 +194,23 @@ class ProductionPlanP2(Document):
 @frappe.whitelist()
 def get_sales_orders(filters):
 	"""Return submitted Sales Orders matching the filter criteria."""
+	frappe.has_permission("Production Plan P2", "read", throw=True)
+	frappe.has_permission("Sales Order", "read", throw=True)
 	if isinstance(filters, str):
 		filters = json.loads(filters)
+	filters = filters or {}
 
+	wip_expr = packed_item_wip_sql("pi2")
+	delivered_expr = "(pi2.qty * IFNULL(soi2.delivered_qty, 0) / NULLIF(soi2.qty, 0))"
 	conditions = [
 		"so.docstatus = 1",
 		"so.status NOT IN ('Stopped', 'Closed', 'Cancelled')",
-		"EXISTS (SELECT 1 FROM `tabSales Order Item` soi2 "
-		" WHERE soi2.parent = so.name "
-		" AND soi2.qty - IFNULL(soi2.delivered_qty, 0) > 0)",
+		"EXISTS (SELECT 1 FROM `tabPacked Item` pi2 "
+		" JOIN `tabSales Order Item` soi2 ON soi2.name = pi2.parent_detail_docname "
+		" JOIN `tabItem` item2 ON item2.name = pi2.item_code "
+		" WHERE pi2.parent = so.name "
+		" AND item2.item_group = 'Component' "
+		f" AND pi2.qty - IFNULL({delivered_expr}, 0) - {wip_expr} > 0)",
 	]
 	values = {}
 
@@ -208,9 +245,15 @@ def get_sales_orders(filters):
 		values["to_del_date"] = filters["to_delivery_date"]
 
 	if filters.get("item_code"):
+		item_wip_expr = packed_item_wip_sql("ipi")
+		item_delivered_expr = "(ipi.qty * IFNULL(isoi.delivered_qty, 0) / NULLIF(isoi.qty, 0))"
 		conditions.append(
-			"EXISTS (SELECT 1 FROM `tabSales Order Item` isoi "
-			" WHERE isoi.parent = so.name AND isoi.item_code = %(item_code)s)"
+			"EXISTS (SELECT 1 FROM `tabPacked Item` ipi "
+			" JOIN `tabSales Order Item` isoi ON isoi.name = ipi.parent_detail_docname "
+			" JOIN `tabItem` iitem ON iitem.name = ipi.item_code "
+			" WHERE ipi.parent = so.name AND ipi.item_code = %(item_code)s "
+			" AND iitem.item_group = 'Component' "
+			f" AND ipi.qty - IFNULL({item_delivered_expr}, 0) - {item_wip_expr} > 0)"
 		)
 		values["item_code"] = filters["item_code"]
 
@@ -232,11 +275,8 @@ def get_sales_orders(filters):
 
 @frappe.whitelist()
 def get_items(source_name=None, doc=None):
-	"""Populate po_items from the sales_orders table on the plan.
-
-	Respects the combine_items flag: if True, rows with the same item_code are
-	merged into one with summed planned_qty.
-	"""
+	"""Populate po_items and section_assignments from the sales_orders table on the plan."""
+	frappe.has_permission("Sales Order", "read", throw=True)
 	plan = get_or_save_plan(source_name, doc)
 	if not plan.sales_orders:
 		frappe.throw(_("Add Sales Orders first before fetching items"))
@@ -245,37 +285,53 @@ def get_items(source_name=None, doc=None):
 	if not so_names:
 		frappe.throw(_("No valid Sales Orders found in the table"))
 
-	# Fetch defaults from IIB Settings
 	settings = frappe.get_single("IIB Settings")
 	default_wip = getattr(settings, "default_wip_warehouse", None) or ""
 	default_fg = getattr(settings, "default_fg_warehouse", None) or ""
 
+	wip_expr = packed_item_wip_sql("pi")
+	delivered_expr = "(pi.qty * IFNULL(soi.delivered_qty, 0) / NULLIF(soi.qty, 0))"
+	available_expr = f"(pi.qty - IFNULL({delivered_expr}, 0) - {wip_expr})"
+	conditions = [
+		"pi.parent IN %(sos)s",
+		"so.docstatus = 1",
+		"item.item_group = 'Component'",
+		f"{available_expr} > 0",
+	]
+	values = {"sos": tuple(so_names)}
+	if plan.item_code:
+		conditions.append("pi.item_code = %(item_code)s")
+		values["item_code"] = plan.item_code
+	where = " AND ".join(conditions)
+
 	rows = frappe.db.sql(
-		"""
+		f"""
 		SELECT
-			soi.name AS sales_order_item,
-			soi.parent AS sales_order,
-			soi.item_code,
-			soi.item_name,
-			soi.description,
-			soi.uom,
-			soi.qty - IFNULL(soi.delivered_qty, 0) AS planned_qty,
+			pi.name AS sales_order_item,
+			pi.parent AS sales_order,
+			pi.item_code,
+			pi.item_name,
+			pi.description,
+			pi.uom,
+			{available_expr} AS planned_qty,
 			soi.delivery_date,
 			so.customer
-		FROM `tabSales Order Item` soi
-		JOIN `tabSales Order` so ON so.name = soi.parent
-		WHERE soi.parent IN %(sos)s
-		  AND so.docstatus = 1
-		  AND (soi.qty - IFNULL(soi.delivered_qty, 0)) > 0
-		ORDER BY soi.parent, soi.idx
+		FROM `tabPacked Item` pi
+		JOIN `tabSales Order Item` soi ON soi.name = pi.parent_detail_docname
+		JOIN `tabSales Order` so ON so.name = pi.parent
+		JOIN `tabItem` item ON item.name = pi.item_code
+		WHERE {where}
+		ORDER BY pi.parent, soi.idx, pi.idx
 		""",
-		{"sos": tuple(so_names)},
+		values,
 		as_dict=True,
 	)
 
 	if not rows:
 		frappe.msgprint(_("No open Sales Order lines found for the selected Sales Orders"))
 		return []
+
+	allocation_rows = [dict(r) for r in rows]
 
 	if plan.combine_items:
 		consolidated = {}
@@ -287,13 +343,28 @@ def get_items(source_name=None, doc=None):
 				consolidated[key] = dict(r)
 		rows = list(consolidated.values())
 
-	# Write directly to DB (plan is already saved as a draft)
 	plan.set("po_items", [])
+	plan.set("so_item_allocations", [])
+	for r in allocation_rows:
+		plan.append(
+			"so_item_allocations",
+			{
+				"sales_order": r["sales_order"],
+				"sales_order_item": r["sales_order_item"],
+				"item_code": r["item_code"],
+				"item_name": r["item_name"],
+				"description": r["description"],
+				"uom": r["uom"],
+				"qty": flt(r["planned_qty"]),
+				"delivery_date": r.get("delivery_date"),
+				"customer": r.get("customer"),
+			},
+		)
 	for r in rows:
 		plan.append(
 			"po_items",
 			{
-				"sales_order": r["sales_order"] if not plan.combine_items else r.get("sales_order", ""),
+				"sales_order": r["sales_order"] if not plan.combine_items else "",
 				"sales_order_item": r["sales_order_item"] if not plan.combine_items else "",
 				"item_code": r["item_code"],
 				"item_name": r["item_name"],
@@ -309,16 +380,66 @@ def get_items(source_name=None, doc=None):
 			},
 		)
 
-	plan.save(ignore_permissions=True)
+	_resolve_section_groups(plan, allocation_rows)
+
+	plan.save()
 	return [row.as_dict() for row in plan.po_items]
 
 
-def get_or_save_plan(source_name=None, doc=None):
-	if source_name and frappe.db.exists("Production Plan P2", source_name):
-		return frappe.get_doc("Production Plan P2", source_name)
+def _resolve_section_groups(plan, item_rows):
+	"""Populate section_assignments with one row per (item_code, sequence) operation.
 
+	Each item's Master Card processes are expanded in sequence order.
+	Existing rows are preserved (by item_code + sequence key) so already-assigned
+	production_sections are not lost when Get Items is clicked multiple times.
+	"""
+	unique_items = list({r["item_code"] for r in item_rows if r.get("item_code")})
+	if not unique_items:
+		return
+
+	existing_keys = {
+		(row.item_code, row.sequence) for row in (plan.section_assignments or [])
+	}
+
+	for item_code in unique_items:
+		mc_name = frappe.db.get_value("Master Card Item", {"item_code": item_code}, "parent")
+		if not mc_name:
+			continue
+		mc = frappe.get_cached_doc("Master Card", mc_name)
+
+		component = None
+		for row in mc.items:
+			if row.item_code == item_code:
+				component = (row.component or "").upper()
+				break
+		if not component:
+			continue
+
+		processes = sorted(
+			[p for p in mc.processes if (p.component or "").upper() == component and p.section],
+			key=lambda p: p.sequence,
+		)
+		for proc in processes:
+			key = (item_code, proc.sequence)
+			if key not in existing_keys:
+				plan.append(
+					"section_assignments",
+					{
+						"item_code": item_code,
+						"item_name": frappe.db.get_value("Item", item_code, "item_name") or "",
+						"sequence": proc.sequence,
+						"section": proc.section,
+						"production_section": "",
+					},
+				)
+				existing_keys.add(key)
+
+
+def get_or_save_plan(source_name=None, doc=None):
 	if not doc:
-		return frappe.get_doc("Production Plan P2", source_name)
+		plan = frappe.get_doc("Production Plan P2", source_name)
+		plan.check_permission("write")
+		return plan
 
 	if isinstance(doc, str):
 		doc = json.loads(doc)
@@ -331,9 +452,11 @@ def get_or_save_plan(source_name=None, doc=None):
 
 	plan.flags.ignore_mandatory = True
 	if plan.name and frappe.db.exists("Production Plan P2", plan.name):
-		plan.save(ignore_permissions=True)
+		plan.check_permission("write")
+		plan.save()
 	else:
-		plan.insert(ignore_permissions=True)
+		frappe.has_permission("Production Plan P2", "create", throw=True)
+		plan.insert()
 
 	return plan
 
@@ -371,28 +494,75 @@ def make_job_orders(source_name):
 
 	Each JO receives a sales_order_items child table with rows from every
 	contributing po_items row, so a single JO can serve multiple SOs.
+	Section assignments on the plan are applied to each JO's operations.
 	"""
 	plan = frappe.get_doc("Production Plan P2", source_name)
+	plan.check_permission("write")
+	frappe.has_permission("Job Order P2", "create", throw=True)
+	frappe.has_permission("Sales Order", "read", throw=True)
 	if plan.docstatus != 1:
 		frappe.throw(_("Production Plan P2 must be submitted before creating Job Orders"))
+
+	# Validate and build (item_code, sequence) → production_section mapping
+	section_map = {}
+	if plan.section_assignments:
+		missing = [
+			f"{sa.item_code} Seq {sa.sequence} ({sa.section})"
+			for sa in plan.section_assignments
+			if not sa.production_section
+		]
+		if missing:
+			frappe.throw(
+				_(
+					"Assign a Production Section (machine) for: {0}. "
+					"Fill in all rows in the Section Assignments table before creating Job Orders."
+				).format(", ".join(missing))
+			)
+		section_map = {
+			(sa.item_code, sa.sequence): sa.production_section
+			for sa in plan.section_assignments
+		}
+
+	from iib.iib.doctype.job_order_p2.job_order_p2 import get_so_item_available_qty
 
 	settings = frappe.get_single("IIB Settings")
 	default_wip = getattr(settings, "default_wip_warehouse", None) or ""
 	default_fg = getattr(settings, "default_fg_warehouse", None) or ""
 
-	# Group po_items rows with pending qty by item_code
-	groups = {}
+	po_item_by_item = {}
 	for row in plan.po_items:
-		pending = flt(row.planned_qty) - flt(row.produced_qty)
-		if pending <= 0:
+		if row.item_code and row.item_code not in po_item_by_item:
+			po_item_by_item[row.item_code] = row
+
+	allocation_rows = [r for r in (plan.so_item_allocations or []) if r.sales_order_item]
+	if not allocation_rows:
+		allocation_rows = [
+			r for r in (plan.po_items or []) if r.sales_order and r.sales_order_item
+		]
+
+	if not allocation_rows and any(flt(r.planned_qty) > flt(r.produced_qty) for r in plan.po_items):
+		frappe.throw(
+			_("SO Item allocation details are missing. Click Get Items again before creating Job Orders.")
+		)
+
+	groups = {}
+	taken_by_so_item = {}
+	for row in allocation_rows:
+		available = get_so_item_available_qty(row.sales_order_item)
+		available -= taken_by_so_item.get(row.sales_order_item, 0)
+		qty_to_allocate = min(flt(row.get("qty") or row.get("planned_qty")), max(available, 0))
+		if qty_to_allocate <= 0:
 			continue
-		groups.setdefault(row.item_code, []).append((row, pending))
+		taken_by_so_item[row.sales_order_item] = (
+			taken_by_so_item.get(row.sales_order_item, 0) + qty_to_allocate
+		)
+		groups.setdefault(row.item_code, []).append((row, qty_to_allocate))
 
 	created = []
 	for item_code, members in groups.items():
 		if not members:
 			continue
-		first_row = members[0][0]
+		first_row = po_item_by_item.get(item_code) or members[0][0]
 		total_qty = sum(p for _, p in members)
 
 		master_card = frappe.db.get_value(
@@ -408,12 +578,11 @@ def make_job_orders(source_name):
 		jo.description = first_row.description
 		jo.master_card = master_card
 		jo.qty = total_qty
-		jo.wip_warehouse = first_row.wip_warehouse or default_wip
-		jo.fg_warehouse = first_row.fg_warehouse or default_fg
-		jo.posting_date = frappe.utils.nowdate()
+		jo.wip_warehouse = getattr(first_row, "wip_warehouse", None) or default_wip
+		jo.fg_warehouse = getattr(first_row, "fg_warehouse", None) or default_fg
+		jo.posting_date = nowdate()
 		jo.due_date = first_row.delivery_date or plan.expected_delivery_date
 
-		# Populate sales_order_items child table from all contributing rows
 		for member_row, member_qty in members:
 			if not member_row.sales_order:
 				continue
@@ -431,7 +600,15 @@ def make_job_orders(source_name):
 				},
 			)
 
-		jo.insert(ignore_permissions=True)
+		jo.insert()
+
+		# Apply production_section by (item_code, sequence) from plan's section assignments
+		if section_map:
+			for op in jo.operations:
+				ps = section_map.get((item_code, op.sequence))
+				if ps:
+					op.db_set("production_section", ps, update_modified=False)
+
 		created.append(jo.name)
 
 	if created:
