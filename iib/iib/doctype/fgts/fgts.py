@@ -22,7 +22,7 @@ class FGTS(StockController):
 
 	def validate(self):
 		self._set_defaults()
-		self._resolve_job_order_p2()
+		self._resolve_job_order_converting()
 		self._calculate_total_qty()
 		if not self.status:
 			self.status = "Draft"
@@ -85,10 +85,10 @@ class FGTS(StockController):
 			self.stores_warehouse = "Stores - IIB"
 
 		# Try to get warehouses from linked JO P2 first
-		if self.job_order_p2 and (not self.wip_warehouse or not self.fg_warehouse):
+		if self.job_order_converting and (not self.wip_warehouse or not self.fg_warehouse):
 			jo_wh = frappe.db.get_value(
-				"Job Order P2",
-				self.job_order_p2,
+				"Job Order Converting",
+				self.job_order_converting,
 				["wip_warehouse", "fg_warehouse"],
 				as_dict=True,
 			)
@@ -118,12 +118,12 @@ class FGTS(StockController):
 			# Default to Work In Progress warehouse
 			return self.wip_warehouse
 
-	def _resolve_job_order_p2(self):
+	def _resolve_job_order_converting(self):
 		"""Find an active JO P2 for the first item if not already set."""
-		if not self.job_order_p2 and self.items:
+		if not self.job_order_converting and self.items:
 			item_code = self.items[0].item_code
 			jo = frappe.db.get_value(
-				"Job Order P2",
+				"Job Order Converting",
 				{
 					"production_item": item_code,
 					"docstatus": 1,
@@ -132,7 +132,7 @@ class FGTS(StockController):
 				"name",
 				order_by="posting_date asc",
 			)
-			self.job_order_p2 = jo or ""
+			self.job_order_converting = jo or ""
 
 	def _calculate_total_qty(self):
 		"""Total Qty = Qty directly. BDL and Loose are informational only."""
@@ -249,10 +249,10 @@ class FGTS(StockController):
 			self.make_gl_entries(gl_map)
 
 	def _update_jo_produced_qty(self):
-		if not self.job_order_p2:
+		if not self.job_order_converting:
 			return
 		try:
-			jo = frappe.get_doc("Job Order P2", self.job_order_p2)
+			jo = frappe.get_doc("Job Order Converting", self.job_order_converting)
 			jo.update_produced_qty()
 		except Exception:
 			pass

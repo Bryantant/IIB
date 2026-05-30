@@ -1,6 +1,7 @@
 [pre_model_sync]
 # Patches added in this section will be executed before doctypes are migrated
 # Read docs to understand patches: https://frappeframework.com/docs/v14/user/en/database-migrations
+iib.patches.v0_0.rename_p1_p2_to_corrugator_converting
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
@@ -13,3 +14,5 @@ iib.patches.v0_0.add_packed_item_wip_quantity_field
 iib.patches.v0_0.convert_iib_production_section_to_tree
 iib.patches.v0_0.reload_p2_stock_transfer_doctypes
 iib.patches.v0_0.recompute_jop2_wip_quantity_submitted_only
+iib.patches.v0_0.sync_tolerance_child_doctypes
+iib.patches.v0_0.drop_old_p1_p2_tables

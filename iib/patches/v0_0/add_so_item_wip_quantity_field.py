@@ -34,7 +34,7 @@ def sync_existing_wip_quantities():
 		for r in frappe.db.sql(
 			"""
 			SELECT DISTINCT sales_order_item
-			FROM `tabJob Order P2 Sales Order Item`
+			FROM `tabJob Order Converting Sales Order Item`
 			WHERE IFNULL(sales_order_item, '') != ''
 			""",
 			as_dict=True,
@@ -56,11 +56,11 @@ def sync_existing_wip_quantities():
 		qty = frappe.db.sql(
 			"""
 			SELECT IFNULL(SUM(josi.qty), 0)
-			FROM `tabJob Order P2 Sales Order Item` josi
-			JOIN `tabJob Order P2` jop2 ON jop2.name = josi.parent
-			WHERE josi.parenttype = 'Job Order P2'
+			FROM `tabJob Order Converting Sales Order Item` josi
+			JOIN `tabJob Order Converting` converting ON converting.name = josi.parent
+			WHERE josi.parenttype = 'Job Order Converting'
 			  AND josi.sales_order_item = %(so_item)s
-			  AND jop2.docstatus < 2
+			  AND converting.docstatus < 2
 			""",
 			{"so_item": so_item},
 		)[0][0]

@@ -2,12 +2,12 @@
 # For license information, please see license.txt
 """Recompute custom_wip_quantity on Sales Order Item and Packed Item.
 
-Previously this field counted ALL non-cancelled Job Order P2 allocations
+Previously this field counted ALL non-cancelled Job Order Converting allocations
 (drafts + submitted). The semantics were tightened to submitted-only to
-parallel JOP1's `custom_jop1_qty`.
+parallel JOP1's `custom_corrugator_qty`.
 
 This patch zeroes the field on every row that has a non-zero value and
-recomputes it from submitted Job Order P2 Sales Order Item rows.
+recomputes it from submitted Job Order Converting Sales Order Item rows.
 """
 
 import frappe
@@ -32,18 +32,18 @@ def execute():
 
 	# Also include any row referenced by a submitted JOP2 (even if its
 	# current value is already 0 — the submitted-only sum may still differ).
-	jop2_refs = frappe.db.sql(
+	converting_refs = frappe.db.sql(
 		"""
 		SELECT DISTINCT josi.sales_order_item
-		FROM `tabJob Order P2 Sales Order Item` josi
-		JOIN `tabJob Order P2` jop2 ON jop2.name = josi.parent
-		WHERE jop2.docstatus = 1
+		FROM `tabJob Order Converting Sales Order Item` josi
+		JOIN `tabJob Order Converting` converting ON converting.name = josi.parent
+		WHERE converting.docstatus = 1
 		  AND josi.sales_order_item IS NOT NULL
 		  AND josi.sales_order_item != ''
 		""",
 		as_dict=True,
 	)
-	pending_refs = [r.sales_order_item for r in jop2_refs]
+	pending_refs = [r.sales_order_item for r in converting_refs]
 
 	# Classify each ref by its source doctype.
 	for ref in pending_refs:
@@ -59,10 +59,10 @@ def execute():
 				frappe.db.sql(
 					"""
 					SELECT IFNULL(SUM(josi.qty), 0)
-					FROM `tabJob Order P2 Sales Order Item` josi
-					JOIN `tabJob Order P2` jop2 ON jop2.name = josi.parent
+					FROM `tabJob Order Converting Sales Order Item` josi
+					JOIN `tabJob Order Converting` converting ON converting.name = josi.parent
 					WHERE josi.sales_order_item = %s
-					  AND jop2.docstatus = 1
+					  AND converting.docstatus = 1
 					""",
 					(name,),
 				)[0][0]

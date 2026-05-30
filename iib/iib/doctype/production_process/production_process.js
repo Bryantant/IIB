@@ -4,12 +4,12 @@ frappe.ui.form.on("Production Process", {
 		frm.set_query("daily_production_schedule", () => ({
 			filters: frm.doc.section ? { section: frm.doc.section, docstatus: 1 } : { docstatus: 1 },
 		}));
-		frm.set_query("job_order_p2", "items", () => ({
+		frm.set_query("job_order_converting", "items", () => ({
 			query: "iib.iib.doctype.production_process.production_process.get_job_orders_for_section",
 			filters: { section: frm.doc.section || "" },
 		}));
-		frm.set_query("job_order_p2", "rejects", () => {
-			const jos = (frm.doc.items || []).map((r) => r.job_order_p2).filter(Boolean);
+		frm.set_query("job_order_converting", "rejects", () => {
+			const jos = (frm.doc.items || []).map((r) => r.job_order_converting).filter(Boolean);
 			return jos.length ? { filters: [["name", "in", jos]] } : {};
 		});
 	},
@@ -91,13 +91,13 @@ function run_fetch_from_dps(frm) {
 // ---- Child table: auto-populate from Job Order when manually adding a row ----
 
 frappe.ui.form.on("Production Process Item", {
-	job_order_p2(frm, cdt, cdn) {
+	job_order_converting(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
-		if (!row.job_order_p2) return;
+		if (!row.job_order_converting) return;
 
 		frappe.call({
 			method: "iib.iib.doctype.production_process.production_process.get_jo_details",
-			args: { job_order_p2: row.job_order_p2, section: frm.doc.section },
+			args: { job_order_converting: row.job_order_converting, section: frm.doc.section },
 			callback(r) {
 				if (!r.message) return;
 				const values = r.message;

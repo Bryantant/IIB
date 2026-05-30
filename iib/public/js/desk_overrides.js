@@ -13,5 +13,5 @@ frappe.router.on("change", function () {
 				$icon.html(frappe.utils.icon("es-line-sidebar-expand", "md"));
 			}
 		}
-	}, 100);
+	}, 300);
 });

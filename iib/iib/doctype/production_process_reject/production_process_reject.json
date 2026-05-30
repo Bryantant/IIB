@@ -5,18 +5,18 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "job_order_p2",
+  "job_order_converting",
   "reject_reason",
   "qty",
   "remark"
  ],
  "fields": [
   {
-   "fieldname": "job_order_p2",
+   "fieldname": "job_order_converting",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Job Order",
-   "options": "Job Order P2",
+   "options": "Job Order Converting",
    "reqd": 1,
    "columns": 3
   },

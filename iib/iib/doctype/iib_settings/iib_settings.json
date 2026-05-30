@@ -20,15 +20,15 @@
   "column_break_job_order",
   "default_cost_center",
   "section_stock_entry_type",
-  "jop2_start_stock_entry_type",
+  "converting_start_stock_entry_type",
   "default_raw_material_warehouse",
   "default_wip_warehouse",
-  "column_break_ppp2",
+  "column_break_converting",
   "default_fg_warehouse",
-  "section_jop1_tolerance",
-  "jop1_tolerance",
-  "section_jop2_tolerance",
-  "jop2_tolerance"
+  "section_corrugator_tolerance",
+  "corrugator_tolerance",
+  "section_converting_tolerance",
+  "converting_tolerance"
  ],
  "fields": [
   {
@@ -124,8 +124,8 @@
    "label": "Stock Entry Type Defaults"
   },
   {
-   "description": "Stock Entry Type used by the Return Components action on Job Order P2 (filter: Material Transfer)",
-   "fieldname": "jop2_start_stock_entry_type",
+   "description": "Stock Entry Type used by the Return Components action on Job Order Converting (filter: Material Transfer)",
+   "fieldname": "converting_start_stock_entry_type",
    "fieldtype": "Link",
    "label": "Return Components SE Type",
    "options": "Stock Entry Type"
@@ -145,7 +145,7 @@
    "options": "Warehouse"
   },
   {
-   "fieldname": "column_break_ppp2",
+   "fieldname": "column_break_converting",
    "fieldtype": "Column Break"
   },
   {
@@ -156,26 +156,26 @@
    "options": "Warehouse"
   },
   {
-   "fieldname": "section_jop1_tolerance",
+   "fieldname": "section_corrugator_tolerance",
    "fieldtype": "Section Break",
-   "label": "Job Order P1 Tolerance"
+   "label": "Job Order Corrugator Tolerance"
   },
   {
-   "fieldname": "jop1_tolerance",
+   "fieldname": "corrugator_tolerance",
    "fieldtype": "Table",
-   "label": "JO P1 Tolerance",
-   "options": "IIB Settings JOP1 Tolerance"
+   "label": "JO Corrugator Tolerance",
+   "options": "IIB Settings Corrugator Tolerance"
   },
   {
-   "fieldname": "section_jop2_tolerance",
+   "fieldname": "section_converting_tolerance",
    "fieldtype": "Section Break",
-   "label": "Job Order P2 Tolerance"
+   "label": "Job Order Converting Tolerance"
   },
   {
-   "fieldname": "jop2_tolerance",
+   "fieldname": "converting_tolerance",
    "fieldtype": "Table",
-   "label": "JO P2 Tolerance",
-   "options": "IIB Settings JOP2 Tolerance"
+   "label": "JO Converting Tolerance",
+   "options": "IIB Settings Converting Tolerance"
   }
  ],
  "issingle": 1,
@@ -193,6 +193,18 @@
    "print": 1,
    "read": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "IIB Manufacturing Manager",
    "share": 1,
    "write": 1
   }

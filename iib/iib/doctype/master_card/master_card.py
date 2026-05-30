@@ -199,14 +199,11 @@ class MasterCard(Document):
 					)
 				)
 
-			if flt(row.moq_qty) <= 0:
-				frappe.throw(_("Price row {0}: MOQ Qty must be greater than zero.").format(row.idx))
-
-			key = (flt(row.moq_qty), component)
+			key = (row.moq_idx, component)
 			if key in seen:
 				frappe.throw(
-					_("Price row {0}: Duplicate price for MOQ {1} and component '{2}'.").format(
-						row.idx, row.moq_qty, component
+					_("Price row {0}: Duplicate component '{1}' in the same MOQ level.").format(
+						row.idx, component
 					)
 				)
 			seen.add(key)
