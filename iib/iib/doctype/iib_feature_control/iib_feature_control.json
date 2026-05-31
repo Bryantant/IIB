@@ -1,0 +1,283 @@
+{
+ "actions": [],
+ "creation": "2026-05-31 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "stock_delivery_section",
+  "pick_list",
+  "col_sd1",
+  "packing_slip",
+  "col_sd2",
+  "shipment",
+  "col_sd3",
+  "delivery_trip",
+  "stock_items_section",
+  "serial_no",
+  "col_si1",
+  "batch_no",
+  "col_si2",
+  "installation_note",
+  "col_si3",
+  "landed_cost_voucher",
+  "purchasing_section",
+  "request_for_quotation",
+  "col_pu1",
+  "supplier_quotation",
+  "col_pu2",
+  "material_request",
+  "sales_section",
+  "quotation",
+  "col_sa1",
+  "sales_partner",
+  "col_sa2",
+  "promotional_scheme",
+  "col_sa3",
+  "coupon_code",
+  "manufacturing_section",
+  "work_order",
+  "col_mf1",
+  "project",
+  "payments_quality_section",
+  "payment_entry",
+  "col_pq1",
+  "payment_request",
+  "col_pq2",
+  "quality_inspection_template"
+ ],
+ "fields": [
+  {
+   "fieldname": "stock_delivery_section",
+   "fieldtype": "Section Break",
+   "label": "Stock & Delivery"
+  },
+  {
+   "default": "0",
+   "fieldname": "pick_list",
+   "fieldtype": "Check",
+   "label": "Pick List"
+  },
+  {
+   "fieldname": "col_sd1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "packing_slip",
+   "fieldtype": "Check",
+   "label": "Packing Slip"
+  },
+  {
+   "fieldname": "col_sd2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "shipment",
+   "fieldtype": "Check",
+   "label": "Shipment"
+  },
+  {
+   "fieldname": "col_sd3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "delivery_trip",
+   "fieldtype": "Check",
+   "label": "Delivery Trip"
+  },
+  {
+   "fieldname": "stock_items_section",
+   "fieldtype": "Section Break",
+   "label": "Stock Items"
+  },
+  {
+   "default": "0",
+   "fieldname": "serial_no",
+   "fieldtype": "Check",
+   "label": "Serial No"
+  },
+  {
+   "fieldname": "col_si1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "batch_no",
+   "fieldtype": "Check",
+   "label": "Batch"
+  },
+  {
+   "fieldname": "col_si2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "installation_note",
+   "fieldtype": "Check",
+   "label": "Installation Note"
+  },
+  {
+   "fieldname": "col_si3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "landed_cost_voucher",
+   "fieldtype": "Check",
+   "label": "Landed Cost Voucher"
+  },
+  {
+   "fieldname": "purchasing_section",
+   "fieldtype": "Section Break",
+   "label": "Purchasing"
+  },
+  {
+   "default": "0",
+   "fieldname": "request_for_quotation",
+   "fieldtype": "Check",
+   "label": "Request for Quotation"
+  },
+  {
+   "fieldname": "col_pu1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "supplier_quotation",
+   "fieldtype": "Check",
+   "label": "Supplier Quotation"
+  },
+  {
+   "fieldname": "col_pu2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "material_request",
+   "fieldtype": "Check",
+   "label": "Material Request"
+  },
+  {
+   "fieldname": "sales_section",
+   "fieldtype": "Section Break",
+   "label": "Sales"
+  },
+  {
+   "default": "0",
+   "fieldname": "quotation",
+   "fieldtype": "Check",
+   "label": "Quotation"
+  },
+  {
+   "fieldname": "col_sa1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "sales_partner",
+   "fieldtype": "Check",
+   "label": "Sales Partner"
+  },
+  {
+   "fieldname": "col_sa2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "promotional_scheme",
+   "fieldtype": "Check",
+   "label": "Promotional Scheme"
+  },
+  {
+   "fieldname": "col_sa3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "coupon_code",
+   "fieldtype": "Check",
+   "label": "Coupon Code"
+  },
+  {
+   "fieldname": "manufacturing_section",
+   "fieldtype": "Section Break",
+   "label": "Manufacturing & Projects"
+  },
+  {
+   "default": "0",
+   "fieldname": "work_order",
+   "fieldtype": "Check",
+   "label": "Work Order"
+  },
+  {
+   "fieldname": "col_mf1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "project",
+   "fieldtype": "Check",
+   "label": "Project"
+  },
+  {
+   "fieldname": "payments_quality_section",
+   "fieldtype": "Section Break",
+   "label": "Payments & Quality"
+  },
+  {
+   "default": "0",
+   "fieldname": "payment_entry",
+   "fieldtype": "Check",
+   "label": "Payment Entry"
+  },
+  {
+   "fieldname": "col_pq1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "payment_request",
+   "fieldtype": "Check",
+   "label": "Payment Request"
+  },
+  {
+   "fieldname": "col_pq2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "quality_inspection_template",
+   "fieldtype": "Check",
+   "label": "Quality Inspection Template"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-05-31 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "IIB Feature Control",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

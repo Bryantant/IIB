@@ -134,7 +134,11 @@ doctype_js = {"Sales Order": "public/js/sales_order_jo_converting.js"}
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {}
+doc_events = {
+	"Delivery Note": {
+		"before_save": "iib.iib.doctype.so_batch.so_batch.set_dn_po_line_no",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
@@ -250,6 +254,8 @@ fixtures = [
     {"dt": "Client Script", "filters": [["module", "=", "IIB"]]},
     {"dt": "Server Script", "filters": [["module", "=", "IIB"]]},
     {"dt": "Item Group", "filters": [["name", "in", ["Master Card", "Sub Assemblies", "Component"]]]},
-    "Custom DocPerm",
     "Translation",
+    # Custom DocPerm is managed by IIB Feature Control (iib_feature_control.py)
+    # and must NOT be stored as a fixture — bench migrate applies fixtures AFTER
+    # patches, which would re-create stale entries on top of the controller's work.
 ]
