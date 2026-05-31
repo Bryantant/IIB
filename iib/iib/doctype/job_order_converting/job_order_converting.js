@@ -266,7 +266,7 @@ function add_start_button(frm) {
 
 function add_view_button(frm) {
 	if (frm.doc.docstatus !== 1) return;
-	frm.add_custom_button(__("View"), () => {
+	frm.add_custom_button(__("Stock Ledger"), () => {
 		frappe.set_route("query-report", "Stock Ledger", {
 			voucher_type: "Job Order Converting RM to WIP",
 			voucher_no: frm.doc.name,
@@ -349,18 +349,3 @@ function set_status(frm, status) {
 function flt(v) {
 	return parseFloat(v || 0) || 0;
 }
-
-frappe.listview_settings["Job Order Converting"] = {
-	get_indicator(doc) {
-		const colors = {
-			Draft: "grey",
-			"Not Started": "orange",
-			"In Process": "yellow",
-			Completed: "green",
-			Stopped: "grey",
-			Closed: "grey",
-			Cancelled: "red",
-		};
-		return [doc.status, colors[doc.status] || "blue", "status,=," + doc.status];
-	},
-};
