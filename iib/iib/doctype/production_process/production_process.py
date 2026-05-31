@@ -54,6 +54,7 @@ class ProductionProcess(Document):
 			{
 				"posting_date": self.posting_date,
 				"section": self.section,
+				"shift": self.shift,
 				"name": ["!=", self.name],
 				"docstatus": ["!=", 2],
 			},
@@ -61,8 +62,8 @@ class ProductionProcess(Document):
 		)
 		if existing:
 			frappe.throw(
-				_("A Production Process already exists for {0} on {1}: {2}").format(
-					self.section, self.posting_date, existing
+				_("A Production Process already exists for {0} ({1}) on {2}: {3}").format(
+					self.section, self.shift, self.posting_date, existing
 				)
 			)
 

@@ -21,12 +21,13 @@
    "columns": 3
   },
   {
+   "columns": 3,
    "fieldname": "reject_reason",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Reject Reason",
-   "reqd": 1,
-   "columns": 3
+   "options": "IIB Reject Reason",
+   "reqd": 1
   },
   {
    "default": "0",
