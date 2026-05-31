@@ -33,12 +33,29 @@ def _rename_doctypes():
 			# Already renamed or never existed — nothing to do.
 			continue
 
+		# A stale tabDocType row can survive when the physical table was dropped
+		# by an earlier failed migration. delete_doc/rename_doc both issue SQL on
+		# the table and blow up if it's missing — guard against that.
+		old_table_exists = bool(
+			frappe.db.sql("SHOW TABLES LIKE %s", (f"tab{old_name}",))
+		)
+
 		if new_exists:
-			# Schema sync already created the new DocType from the updated JSON
-			# files before this patch ran. Drop the orphaned old record + table.
-			frappe.delete_doc("DocType", old_name, force=True, ignore_permissions=True)
+			if old_table_exists:
+				frappe.delete_doc("DocType", old_name, force=True, ignore_permissions=True)
+			else:
+				frappe.db.delete("DocType", {"name": old_name})
+				frappe.db.delete("DocField", {"parent": old_name})
+				frappe.db.delete("Custom Field", {"dt": old_name})
 		else:
-			frappe.rename_doc("DocType", old_name, new_name, force=True)
+			if old_table_exists:
+				frappe.rename_doc("DocType", old_name, new_name, force=True)
+			else:
+				# No table to rename — drop the orphaned record so schema sync
+				# can recreate the DocType cleanly under the new name.
+				frappe.db.delete("DocType", {"name": old_name})
+				frappe.db.delete("DocField", {"parent": old_name})
+				frappe.db.delete("Custom Field", {"dt": old_name})
 
 
 def _rename_custom_fields():
