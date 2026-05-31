@@ -249,6 +249,9 @@ company_data_to_be_ignored = ["Master Card"]
 
 fixtures = [
     {"dt": "Role", "filters": [["name", "in", ["IIB Manufacturing Manager"]]]},
+    {"dt": "Role Profile", "filters": [["name", "in", ["Program Manager"]]]},
+    {"dt": "Module Profile", "filters": [["name", "in", ["All"]]]},
+    {"dt": "Workspace", "filters": [["module", "=", "IIB"]]},
     {"dt": "Property Setter", "filters": [["module", "=", "IIB"]]},
     {"dt": "Custom Field", "filters": [["module", "=", "IIB"]]},
     {"dt": "Client Script", "filters": [["module", "=", "IIB"]]},
