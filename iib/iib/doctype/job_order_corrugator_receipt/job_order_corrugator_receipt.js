@@ -218,10 +218,3 @@ function recompute_amount(frm, cdt, cdn) {
 	frm.set_value("total_qty", total_qty);
 	frm.set_value("total_amount", total_amount);
 }
-
-frappe.listview_settings["Job Order Corrugator Receipt"] = {
-	get_indicator(doc) {
-		const colors = { Draft: "orange", Submitted: "green", Cancelled: "red" };
-		return [doc.status, colors[doc.status] || "blue", "status,=," + doc.status];
-	},
-};

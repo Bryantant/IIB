@@ -12,6 +12,7 @@ frappe.ui.form.on("Production Process", {
 			const jos = (frm.doc.items || []).map((r) => r.job_order_converting).filter(Boolean);
 			return jos.length ? { filters: [["name", "in", jos]] } : {};
 		});
+		frm.set_query("reject_reason", "rejects", () => ({}));
 	},
 
 	refresh(frm) {

@@ -96,7 +96,6 @@ class JobOrderConvertingWIPtoFG(StockController):
 
 	def update_stock_ledger(self):
 		"""Create paired SL entries: WIP OUT, FG IN."""
-		sign = 1 if self.docstatus == 1 else -1
 		sl_entries = []
 		for d in self.get("items"):
 			if not d.item_code:
@@ -106,7 +105,7 @@ class JobOrderConvertingWIPtoFG(StockController):
 				self.get_sl_entries(
 					d,
 					{
-						"actual_qty": -flt(d.qty) * sign,
+						"actual_qty": -flt(d.qty),
 						"warehouse": self.source_warehouse,
 					},
 				)
@@ -116,7 +115,7 @@ class JobOrderConvertingWIPtoFG(StockController):
 				self.get_sl_entries(
 					d,
 					{
-						"actual_qty": flt(d.qty) * sign,
+						"actual_qty": flt(d.qty),
 						"incoming_rate": flt(d.basic_rate),
 						"warehouse": self.target_warehouse,
 					},

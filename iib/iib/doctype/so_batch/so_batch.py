@@ -65,7 +65,7 @@ class SOBatch(Document):
             item_code = row.resolved_set_item_code or row.resolved_item_code
             expected_rate, component_rates = get_expected_rate_for_so_batch_row(row)
             expected_rate = get_sales_order_rate(expected_rate)
-            key = (row.po_no, row.po_date)
+            key = (row.po_no, row.po_date, row.line_no)
             po_groups.setdefault(key, []).append(
                 {
                     "item_code": item_code,
@@ -76,7 +76,7 @@ class SOBatch(Document):
             )
 
         created_sos = []
-        for (po_no, po_date), items in po_groups.items():
+        for (po_no, po_date, line_no), items in po_groups.items():
             so = frappe.new_doc("Sales Order")
             so.company = company
             so.customer = self.customer
@@ -90,6 +90,7 @@ class SOBatch(Document):
             so.set_warehouse = self.default_warehouse
             so.po_no = po_no
             so.po_date = po_date
+            so.po_line_no = line_no
             so.so_batch = self.name
 
             for item in items:
@@ -435,3 +436,12 @@ def get_price_matrix_precision():
         frappe.get_precision("SO Batch Item", "rate") or 2,
         frappe.get_precision("Master Card Price Item", "total") or 2,
     )
+
+
+def set_dn_po_line_no(doc, method=None):
+    """Copy po_line_no from the linked Sales Order onto each Delivery Note Item."""
+    for item in doc.items or []:
+        if item.against_sales_order and not item.get("po_line_no"):
+            item.po_line_no = frappe.db.get_value(
+                "Sales Order", item.against_sales_order, "po_line_no"
+            ) or ""

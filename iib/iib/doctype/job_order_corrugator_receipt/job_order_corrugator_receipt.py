@@ -272,7 +272,7 @@ class JobOrderCorrugatorReceipt(StockController):
 				self.get_sl_entries(
 					d,
 					{
-						"actual_qty": flt(d.qty) * (1 if self.docstatus == 1 else -1),
+						"actual_qty": flt(d.qty),
 						"incoming_rate": flt(d.basic_rate),
 						"warehouse": d.target_warehouse,
 					},
