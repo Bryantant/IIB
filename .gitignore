@@ -6,3 +6,8 @@ tags
 node_modules
 __pycache__
 CLAUDE.md
+
+# local scratch / debug files
+P1_P2_RENAME_INVENTORY.txt
+iib/_update_picklist_scripts.py
+iib/test_customer_debug.py
