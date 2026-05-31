@@ -69,11 +69,11 @@ class ProductionProcess(Document):
 	def _validate_reject_uniqueness(self):
 		seen = set()
 		for row in self.rejects or []:
-			key = (row.job_order_p2 or "", (row.reject_reason or "").strip())
+			key = (row.job_order_converting or "", (row.reject_reason or "").strip())
 			if key in seen:
 				frappe.throw(
 					_("Row {0}: Reject reason '{1}' already entered for Job Order {2}").format(
-						row.idx, row.reject_reason, row.job_order_p2
+						row.idx, row.reject_reason, row.job_order_converting
 					)
 				)
 			seen.add(key)
@@ -95,24 +95,24 @@ class ProductionProcess(Document):
 		)
 
 		for row in self.items or []:
-			if not row.job_order_p2:
+			if not row.job_order_converting:
 				continue
 			op_name = frappe.db.get_value(
-				"Job Order P2 Operation",
+				"Job Order Converting Operation",
 				{
-					"parent": row.job_order_p2,
-					"parenttype": "Job Order P2",
+					"parent": row.job_order_converting,
+					"parenttype": "Job Order Converting",
 					"section": section_group,
 				},
 				"name",
 			)
-			row.job_order_p2_operation = op_name or ""
+			row.job_order_converting_operation = op_name or ""
 
 			# Stamp the leaf section onto the JO P2 operation so the Operations
 			# table in JO P2 shows which machine handled it.
 			if op_name:
 				frappe.db.set_value(
-					"Job Order P2 Operation",
+					"Job Order Converting Operation",
 					op_name,
 					"production_section",
 					self.section,
@@ -147,7 +147,7 @@ class ProductionProcess(Document):
 
 	def _write_back_completed_qty(self):
 		"""Aggregate completed_qty from ALL non-cancelled Production Process docs for each
-		(job_order_p2, operation) pair touched by this PP, then write the total back.
+		(job_order_converting, operation) pair touched by this PP, then write the total back.
 
 		Using a DB-level SUM (rather than this doc's c_qty alone) means:
 		  - Multiple PP docs for the same operation accumulate correctly.
@@ -157,8 +157,8 @@ class ProductionProcess(Document):
 		# Collect unique (jo_name, op_name) pairs referenced in this PP's items.
 		pairs = set()
 		for row in self.items or []:
-			if row.job_order_p2 and row.job_order_p2_operation:
-				pairs.add((row.job_order_p2, row.job_order_p2_operation))
+			if row.job_order_converting and row.job_order_converting_operation:
+				pairs.add((row.job_order_converting, row.job_order_converting_operation))
 
 		if not pairs:
 			return
@@ -173,14 +173,14 @@ class ProductionProcess(Document):
 					SELECT IFNULL(SUM(ppi.c_qty), 0)
 					FROM `tabProduction Process Item` ppi
 					JOIN `tabProduction Process` pp ON pp.name = ppi.parent
-					WHERE ppi.job_order_p2_operation = %s
+					WHERE ppi.job_order_converting_operation = %s
 					  AND pp.docstatus != 2
 					""",
 					(op_name,),
 				)[0][0]
 			)
 
-			jo = frappe.get_doc("Job Order P2", jo_name)
+			jo = frappe.get_doc("Job Order Converting", jo_name)
 			for op in jo.operations or []:
 				if op.name == op_name:
 					op.db_set("completed_qty", total, update_modified=False)
@@ -213,19 +213,19 @@ def fetch_from_dps(daily_production_schedule):
 	results = []
 	for row in dps.items or []:
 		op_name = frappe.db.get_value(
-			"Job Order P2 Operation",
+			"Job Order Converting Operation",
 			{
-				"parent": row.job_order_p2,
-				"parenttype": "Job Order P2",
+				"parent": row.job_order_converting,
+				"parenttype": "Job Order Converting",
 				"section": dps_section_group,
 			},
 			"name",
 		)
 		# Get JO qty for p_qty default (planned qty for this session starts at full JO qty)
-		jo_qty = frappe.db.get_value("Job Order P2", row.job_order_p2, "qty") or 0
+		jo_qty = frappe.db.get_value("Job Order Converting", row.job_order_converting, "qty") or 0
 		results.append({
-			"job_order_p2": row.job_order_p2,
-			"job_order_p2_operation": op_name or "",
+			"job_order_converting": row.job_order_converting,
+			"job_order_converting_operation": op_name or "",
 			"item_code": row.item_code,
 			"item_name": row.item_name or "",
 			"master_card": row.master_card or "",
@@ -239,11 +239,11 @@ def fetch_from_dps(daily_production_schedule):
 
 
 @frappe.whitelist()
-def get_jo_details(job_order_p2, section):
+def get_jo_details(job_order_converting, section):
 	frappe.has_permission("Production Process", "read", throw=True)
 	jo = frappe.db.get_value(
-		"Job Order P2",
-		job_order_p2,
+		"Job Order Converting",
+		job_order_converting,
 		["production_item", "item_name", "master_card", "qty", "due_date"],
 		as_dict=True,
 	)
@@ -251,8 +251,8 @@ def get_jo_details(job_order_p2, section):
 		return {}
 
 	so_row = frappe.db.get_value(
-		"Job Order P2 Sales Order Item",
-		{"parent": job_order_p2, "parenttype": "Job Order P2"},
+		"Job Order Converting Sales Order Item",
+		{"parent": job_order_converting, "parenttype": "Job Order Converting"},
 		["sales_order", "customer", "delivery_date"],
 		as_dict=True,
 		order_by="idx asc",
@@ -269,8 +269,8 @@ def get_jo_details(job_order_p2, section):
 		or section
 	)
 	op_name = frappe.db.get_value(
-		"Job Order P2 Operation",
-		{"parent": job_order_p2, "parenttype": "Job Order P2", "section": section_group},
+		"Job Order Converting Operation",
+		{"parent": job_order_converting, "parenttype": "Job Order Converting", "section": section_group},
 		"name",
 	)
 
@@ -282,7 +282,7 @@ def get_jo_details(job_order_p2, section):
 		"so_no": (so_row or {}).get("sales_order") or "",
 		"so_qty": jo.qty or 0,
 		"due_date": (so_row or {}).get("delivery_date") or jo.due_date,
-		"job_order_p2_operation": op_name or "",
+		"job_order_converting_operation": op_name or "",
 	}
 
 
@@ -301,8 +301,8 @@ def get_job_orders_for_section(doctype, txt, searchfield, start, page_len, filte
 	return frappe.db.sql(
 		"""
 		SELECT DISTINCT jo.name, jo.production_item
-		FROM `tabJob Order P2` jo
-		JOIN `tabJob Order P2 Operation` op ON op.parent = jo.name
+		FROM `tabJob Order Converting` jo
+		JOIN `tabJob Order Converting Operation` op ON op.parent = jo.name
 		WHERE jo.docstatus = 1
 		  AND op.section = (
 		      SELECT parent_iib_production_section

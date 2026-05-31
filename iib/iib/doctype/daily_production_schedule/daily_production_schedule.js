@@ -29,7 +29,7 @@ function run_fetch_pending_jobs(frm) {
 		frappe.show_alert({ message: __("Set Section first"), indicator: "orange" });
 		return;
 	}
-	const existing_jos = (frm.doc.items || []).map((r) => r.job_order_p2).filter(Boolean);
+	const existing_jos = (frm.doc.items || []).map((r) => r.job_order_converting).filter(Boolean);
 	frappe.call({
 		method: "iib.iib.doctype.daily_production_schedule.daily_production_schedule.get_pending_jobs",
 		args: {

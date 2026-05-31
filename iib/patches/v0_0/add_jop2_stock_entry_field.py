@@ -7,10 +7,10 @@ def execute():
 		{
 			"Stock Entry": [
 				{
-					"fieldname": "iib_job_order_p2",
-					"label": "Job Order P2",
+					"fieldname": "iib_job_order_converting",
+					"label": "Job Order Converting",
 					"fieldtype": "Link",
-					"options": "Job Order P2",
+					"options": "Job Order Converting",
 					"insert_after": "work_order",
 					"read_only": 1,
 					"no_copy": 1,

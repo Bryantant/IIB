@@ -1,10 +1,10 @@
 # Copyright (c) 2026, Hicom System and contributors
 # For license information, please see license.txt
-"""Shared tolerance-lookup helper for Job Order P1 and P2 tiered tolerance tables.
+"""Shared tolerance-lookup helper for Job Order Corrugator and P2 tiered tolerance tables.
 
 The tolerance tables in IIB Settings are simple tiered lookups:
 
-	jop1_qty / jop2_qty  →  jop1_toleransi / jop2_toleransi
+	corrugator_qty / converting_qty  →  corrugator_toleransi / converting_toleransi
 
 The first tier whose Max-Qty is >= so_qty applies. If so_qty exceeds every
 tier's Max, the last (highest) tier's tolerance is used.

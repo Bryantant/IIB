@@ -31,7 +31,7 @@
   "fg_warehouse",
   "stores_warehouse",
   "sec_internal",
-  "job_order_p2",
+  "job_order_converting",
   "wip_to_fg_done",
   "fg_to_stores_done",
   "cost_center",
@@ -211,11 +211,11 @@
    "hidden": 1
   },
   {
-   "fieldname": "job_order_p2",
+   "fieldname": "job_order_converting",
    "fieldtype": "Link",
    "hidden": 1,
-   "label": "Job Order P2",
-   "options": "Job Order P2"
+   "label": "Job Order Converting",
+   "options": "Job Order Converting"
   },
   {
    "default": "0",
@@ -300,6 +300,21 @@
    "share": 1,
    "submit": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "IIB Manufacturing Manager",
+   "share": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
   }
  ],
  "row_format": "Dynamic",

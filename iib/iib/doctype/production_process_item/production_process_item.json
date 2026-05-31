@@ -5,8 +5,8 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "job_order_p2",
-  "job_order_p2_operation",
+  "job_order_converting",
+  "job_order_converting_operation",
   "item_code",
   "item_name",
   "master_card",
@@ -29,16 +29,16 @@
  ],
  "fields": [
   {
-   "fieldname": "job_order_p2",
+   "fieldname": "job_order_converting",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Job Order",
-   "options": "Job Order P2",
+   "options": "Job Order Converting",
    "reqd": 1,
    "columns": 2
   },
   {
-   "fieldname": "job_order_p2_operation",
+   "fieldname": "job_order_converting_operation",
    "fieldtype": "Data",
    "hidden": 1,
    "label": "JO Operation Ref",

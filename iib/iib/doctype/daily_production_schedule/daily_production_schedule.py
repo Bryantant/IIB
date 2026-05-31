@@ -61,14 +61,14 @@ def get_pending_jobs(section, posting_date, existing_jos=None):
 	rows = frappe.db.sql(
 		f"""
 		SELECT DISTINCT
-			jo.name AS job_order_p2,
+			jo.name AS job_order_converting,
 			jo.production_item AS item_code,
 			jo.item_name,
 			jo.master_card,
 			jo.qty AS so_qty,
 			jo.due_date
-		FROM `tabJob Order P2` jo
-		JOIN `tabJob Order P2 Operation` op ON op.parent = jo.name
+		FROM `tabJob Order Converting` jo
+		JOIN `tabJob Order Converting Operation` op ON op.parent = jo.name
 		WHERE {conditions}
 		ORDER BY jo.due_date, jo.name
 	""",
@@ -79,8 +79,8 @@ def get_pending_jobs(section, posting_date, existing_jos=None):
 	results = []
 	for jo in rows:
 		so_row = frappe.db.get_value(
-			"Job Order P2 Sales Order Item",
-			{"parent": jo.job_order_p2, "parenttype": "Job Order P2"},
+			"Job Order Converting Sales Order Item",
+			{"parent": jo.job_order_converting, "parenttype": "Job Order Converting"},
 			["sales_order", "customer", "delivery_date"],
 			as_dict=True,
 			order_by="idx asc",
@@ -103,7 +103,7 @@ def get_pending_jobs(section, posting_date, existing_jos=None):
 			colours = ", ".join(colour_parts)
 
 		results.append({
-			"job_order_p2": jo.job_order_p2,
+			"job_order_converting": jo.job_order_converting,
 			"item_code": jo.item_code,
 			"item_name": jo.item_name or "",
 			"master_card": jo.master_card or "",

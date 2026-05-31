@@ -7,13 +7,17 @@ frappe.ui.form.on("Master Card", {
 	},
 
 	refresh(frm) {
+		// Close sidebar — runs after all rendering is done, so it wins the timing race
+		// with desk_overrides.js which fires too early on route change.
+		frm.page.sidebar && frm.page.sidebar.hide();
+
 		frm.set_df_property("item_code", "read_only", 1);
 		frm.trigger("render_mc_badge");
 		frm.trigger("render_copy_buttons");
 		frm.trigger("add_action_buttons");
 		apply_price_currency_formatters(frm);
 		calculate_price_rows(frm);
-		render_price_items_summary(frm);
+		render_price_items_editor(frm);
 
 		// Force correct column definitions on the processes grid.
 		// Browser localStorage may cache an older schema, so patch docfields
@@ -139,18 +143,9 @@ frappe.ui.form.on("Master Card", {
 		set_process_sequence(frm, cdt, cdn);
 	},
 
-	price_items_add(frm, cdt, cdn) {
-		calculate_price_row(frm, cdt, cdn);
-	},
-
-	price_items_remove(frm) {
-		render_price_items_summary(frm);
-	},
-
 	currency(frm) {
 		apply_price_currency_formatters(frm);
-		render_price_items_summary(frm);
-		frm.refresh_field("price_items");
+		render_price_items_editor(frm);
 	},
 
 });
@@ -176,59 +171,15 @@ frappe.ui.form.on("Master Card Item", {
 			frappe.model.set_value(cdt, cdn, "item_code", frm.doc.name + letter);
 		}
 
-		// Re-render tabs so the new component letter appears
 		frm.trigger("render_process_tabs");
-		render_price_items_summary(frm);
-	},
-
-	qty(frm) {
-		render_price_items_summary(frm);
 	},
 
 	items_remove(frm) {
-		// Re-render tabs after a component row is deleted
 		frm.trigger("render_process_tabs");
-		render_price_items_summary(frm);
 	},
 });
 
-frappe.ui.form.on("Master Card Price Item", {
-	moq_qty(frm, cdt, cdn) {
-		calculate_price_row(frm, cdt, cdn);
-	},
-
-	component(frm, cdt, cdn) {
-		let row = locals[cdt][cdn];
-		let component = (row.component || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 1);
-		frappe.model.set_value(cdt, cdn, "component", component).then(() => {
-			render_price_items_summary(frm);
-		});
-	},
-
-	material(frm, cdt, cdn) {
-		calculate_price_row(frm, cdt, cdn);
-	},
-
-	labour(frm, cdt, cdn) {
-		calculate_price_row(frm, cdt, cdn);
-	},
-
-	profit(frm, cdt, cdn) {
-		calculate_price_row(frm, cdt, cdn);
-	},
-
-	ext_profit(frm, cdt, cdn) {
-		calculate_price_row(frm, cdt, cdn);
-	},
-
-	price_items_add(frm, cdt, cdn) {
-		calculate_price_row(frm, cdt, cdn);
-	},
-
-	price_items_remove(frm) {
-		render_price_items_summary(frm);
-	},
-});
+// Master Card Price Item events are handled by the HTML widget inputs directly.
 
 // ------------------------------------------------------------------
 // Process child table — auto-fill component from active tab
@@ -385,110 +336,247 @@ function calculate_price_rows(frm) {
 	(frm.doc.price_items || []).forEach((row) => {
 		calculate_price_row(frm, row.doctype, row.name, false);
 	});
-	render_price_items_summary(frm);
+	render_price_items_editor(frm);
 }
 
-function calculate_price_row(frm, cdt, cdn, render = true) {
+function calculate_price_row(frm, cdt, cdn, rerender = true) {
 	const row = locals[cdt] && locals[cdt][cdn];
 	if (!row) return;
-
-	const total =
-		flt(row.material) + flt(row.labour) + flt(row.profit) + flt(row.ext_profit);
+	const total = flt(row.material) + flt(row.labour) + flt(row.profit) + flt(row.ext_profit);
 	frappe.model.set_value(cdt, cdn, "total", total);
-
-	if (render) {
-		render_price_items_summary(frm);
-	}
+	if (rerender) render_price_items_editor(frm);
 }
 
-function render_price_items_summary(frm) {
+// ------------------------------------------------------------------
+// Interactive Item Price Set editor (Access-style layout)
+// ------------------------------------------------------------------
+
+function render_price_items_editor(frm) {
 	const field = frm.fields_dict.price_items_html;
 	if (!field) return;
 
-	const rows = (frm.doc.price_items || []).slice().sort((a, b) => {
-		const moqDiff = flt(a.moq_qty) - flt(b.moq_qty);
-		if (moqDiff) return moqDiff;
-		return String(a.component || "").localeCompare(String(b.component || ""));
-	});
+	const $w = field.$wrapper.empty();
+	const moqList = (frm.doc.moq_items || []).slice().sort((a, b) => a.idx - b.idx);
+	const priceRows = (frm.doc.price_items || []);
 
-	if (!rows.length) {
-		field.$wrapper.html(
-			`<p class="text-muted small" style="margin:4px 0 8px">${__(
-				"Add price rows below. Rows are grouped by MOQ quantity."
-			)}</p>`
-		);
-		return;
+	if (!moqList.length) {
+		$(`<p class="text-muted small" style="margin:4px 0 8px">${__(
+			'Click "+ Add MOQ Level" to define pricing tiers.'
+		)}</p>`).appendTo($w);
+	} else {
+		const $table = $(`
+			<table class="table table-bordered table-condensed mc-price-table" style="margin-bottom:8px">
+				<thead><tr>
+					<th style="min-width:130px"></th>
+					<th style="width:54px">${__("Comp")}</th>
+					<th class="text-right">${__("Material")}</th>
+					<th class="text-right">${__("Labour")}</th>
+					<th class="text-right">${__("Profit")}</th>
+					<th class="text-right">${__("Ext Profit")}</th>
+					<th class="text-right">${__("Total")}</th>
+					<th style="width:26px"></th>
+				</tr></thead>
+				<tbody></tbody>
+			</table>
+		`).appendTo($w);
+		const $tbody = $table.find("tbody");
+
+		moqList.forEach((moqRow, listIdx) => {
+			const moqNum = listIdx + 1;
+			const compRows = priceRows
+				.filter((r) => r.moq_idx === moqRow.idx)
+				.sort((a, b) => (a.idx || 0) - (b.idx || 0));
+			// +1 for "Add Component" row; +1 for totals row (only when there are components)
+			const rowspan = compRows.length > 0
+				? compRows.length + 2
+				: 2;
+
+			const $moqTd = $(`<td rowspan="${rowspan}" style="vertical-align:top;padding:6px 8px;white-space:nowrap;">
+				<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+					<span class="text-muted" style="font-size:var(--text-sm)">MOQ ${moqNum} :</span>
+					<input type="number" step="any" value="${flt(moqRow.moq_qty)}"
+						class="mc-moq-input"
+						data-moq-name="${moqRow.name}"
+						style="width:64px;padding:2px 4px;border:1px solid var(--border-color);border-radius:var(--border-radius-sm);text-align:right;font-size:var(--text-sm);">
+				</div>
+				<button class="btn btn-xs" style="color:var(--red-500);padding:0 4px;line-height:1.4;font-size:10px;" data-del-moq="${moqRow.name}" title="${__("Remove MOQ level")}">✕ ${__("Remove")}</button>
+			</td>`);
+
+			if (compRows.length === 0) {
+				// Empty MOQ group
+				const $tr = $("<tr>").appendTo($tbody);
+				$tr.append($moqTd);
+				$(`<td colspan="6" class="text-muted" style="vertical-align:middle;font-size:var(--text-sm);padding:6px 10px;">${__(
+					"No components — use Add below"
+				)}</td>`).appendTo($tr);
+				$("<td></td>").appendTo($tr);
+			} else {
+				compRows.forEach((compRow, compIdx) => {
+					const $tr = $("<tr>").appendTo($tbody);
+					if (compIdx === 0) $tr.append($moqTd);
+
+					// Comp
+					$("<td>").append(
+						$(`<input type="text" maxlength="1" value="${frappe.utils.escape_html(compRow.component || "")}"
+							class="mc-price-input" data-row="${compRow.name}" data-field="component"
+							style="width:36px;padding:2px 3px;border:1px solid var(--border-color);border-radius:var(--border-radius-sm);text-align:center;font-weight:600;">`)
+					).appendTo($tr);
+
+					// Currency fields
+					["material", "labour", "profit", "ext_profit"].forEach((f) => {
+						$("<td>").append(
+							$(`<input type="number" step="0.0001" value="${flt(compRow[f], 4)}"
+								class="mc-price-input" data-row="${compRow.name}" data-field="${f}"
+								style="width:100%;min-width:82px;padding:2px 4px;border:1px solid var(--border-color);border-radius:var(--border-radius-sm);text-align:right;font-size:var(--text-sm);">`)
+						).appendTo($tr);
+					});
+
+					// Total (read-only)
+					$(`<td class="text-right" style="vertical-align:middle;white-space:nowrap;padding:4px 6px;"
+						data-total-row="${compRow.name}">${format_price_currency(compRow.total, frm.doc.currency)}</td>`).appendTo($tr);
+
+					// Delete component button
+					$('<td style="vertical-align:middle;text-align:center;padding:2px;">').append(
+						$(`<button class="btn btn-xs" style="color:var(--red-500);padding:0 5px;line-height:1.6">×</button>`)
+							.on("click", () => remove_price_row(frm, compRow.name))
+					).appendTo($tr);
+				});
+			}
+
+			// Totals row — each component value × its qty from the Finish Goods table
+			if (compRows.length > 0) {
+				const qtyMap = get_component_qty_map(frm);
+				const qty = (r) => qtyMap[(r.component || "").toUpperCase().trim()] || 1;
+				const sumMaterial  = compRows.reduce((s, r) => s + flt(r.material)  * qty(r), 0);
+				const sumLabour    = compRows.reduce((s, r) => s + flt(r.labour)    * qty(r), 0);
+				const sumProfit    = compRows.reduce((s, r) => s + flt(r.profit)    * qty(r), 0);
+				const sumExtProfit = compRows.reduce((s, r) => s + flt(r.ext_profit)* qty(r), 0);
+				const sumTotal     = compRows.reduce((s, r) => s + flt(r.total)     * qty(r), 0);
+				const $totTr = $("<tr>").appendTo($tbody);
+				const cellStyle = "text-align:right;padding:3px 6px;font-weight:600;background:var(--bg-light-gray);border-top:2px solid var(--border-color);white-space:nowrap;";
+				$(`<td style="padding:3px 6px;background:var(--bg-light-gray);border-top:2px solid var(--border-color);font-size:var(--text-sm);color:var(--text-muted);">Total</td>`).appendTo($totTr);
+				[sumMaterial, sumLabour, sumProfit, sumExtProfit, sumTotal].forEach((val) => {
+					$(`<td style="${cellStyle}">${format_price_currency(val, frm.doc.currency)}</td>`).appendTo($totTr);
+				});
+				$(`<td style="background:var(--bg-light-gray);border-top:2px solid var(--border-color);"></td>`).appendTo($totTr);
+			}
+
+			// "Add Component" action row for this MOQ group
+			const $addTr = $("<tr>").appendTo($tbody);
+			$(`<td colspan="6" style="padding:3px 6px;border-top:none;">`).append(
+				$(`<button class="btn btn-xs btn-default">+ ${__("Add Component")}</button>`)
+					.on("click", () => {
+						const newRow = frappe.model.add_child(frm.doc, "Master Card Price Item", "price_items");
+						frappe.model.set_value("Master Card Price Item", newRow.name, "moq_idx", moqRow.idx).then(() => {
+							render_price_items_editor(frm);
+						});
+					})
+			).appendTo($addTr);
+			$("<td></td>").appendTo($addTr);
+		});
 	}
 
-	const grouped = rows.reduce((acc, row) => {
-		const moq = flt(row.moq_qty);
-		if (!acc[moq]) acc[moq] = [];
-		acc[moq].push(row);
-		return acc;
-	}, {});
-	const qty_by_component = get_component_qty_map(frm);
+	// "Add MOQ Level" button
+	$(`<button class="btn btn-xs btn-default" style="margin-top:4px">+ ${__("Add MOQ Level")}</button>`)
+		.appendTo($w)
+		.on("click", () => {
+			frappe.model.add_child(frm.doc, "Master Card MOQ", "moq_items");
+			frm.refresh_field("moq_items");
+			render_price_items_editor(frm);
+		});
 
-	const blocks = Object.keys(grouped)
-		.map((moq) => {
-			const body = grouped[moq]
-				.map((row) => {
-					const component = (row.component || "").toUpperCase().trim();
-					const qty = qty_by_component[component] || 1;
-					const set_total = flt(row.total) * qty;
-					return `
-						<tr>
-							<td>${frappe.utils.escape_html(component)}</td>
-							<td class="text-right">${format_price_currency(row.material, frm.doc.currency)}</td>
-							<td class="text-right">${format_price_currency(row.labour, frm.doc.currency)}</td>
-							<td class="text-right">${format_price_currency(row.profit, frm.doc.currency)}</td>
-							<td class="text-right">${format_price_currency(row.ext_profit, frm.doc.currency)}</td>
-							<td class="text-right">${format_qty(qty)}</td>
-							<td class="text-right">${format_price_currency(row.total, frm.doc.currency)}</td>
-							<td class="text-right">${format_price_currency(set_total, frm.doc.currency)}</td>
-						</tr>`;
-				})
-				.join("");
+	// --- Event handlers ---
 
-			const total = grouped[moq].reduce((sum, row) => {
-				const component = (row.component || "").toUpperCase().trim();
-				const qty = qty_by_component[component] || 1;
-				return sum + flt(row.total) * qty;
-			}, 0);
-			return `
-				<div style="margin:0 0 12px">
-					<div class="text-muted small" style="margin-bottom:4px">${__("MOQ Qty")}: <strong>${moq}</strong> &nbsp; ${__(
-						"Total Set Price"
-					)}: <strong>${format_price_currency(total, frm.doc.currency)}</strong></div>
-					<div class="table-responsive">
-						<table class="table table-bordered table-condensed" style="margin-bottom:0">
-							<thead>
-								<tr>
-									<th>${__("Comp")}</th>
-									<th class="text-right">${__("Material")}</th>
-									<th class="text-right">${__("Labour")}</th>
-									<th class="text-right">${__("Profit")}</th>
-									<th class="text-right">${__("Ext Profit")}</th>
-									<th class="text-right">${__("Qty")}</th>
-									<th class="text-right">${__("Unit Total")}</th>
-									<th class="text-right">${__("Set Total")}</th>
-								</tr>
-							</thead>
-							<tbody>${body}</tbody>
-						</table>
-					</div>
-				</div>`;
-		})
-		.join("");
+	// MOQ qty change
+	$w.find(".mc-moq-input").on("change", function () {
+		const moqName = $(this).data("moq-name");
+		const newQty = flt($(this).val());
+		frappe.model.set_value("Master Card MOQ", moqName, "moq_qty", newQty);
+		frm.dirty();
+	});
 
-	field.$wrapper.html(blocks);
+	// Remove MOQ level (and its component rows)
+	$w.find("[data-del-moq]").on("click", function () {
+		const moqName = $(this).data("del-moq");
+		const moqRow = (frm.doc.moq_items || []).find((r) => r.name === moqName);
+		if (!moqRow) return;
+
+		const affectedComps = (frm.doc.price_items || []).filter((r) => r.moq_idx === moqRow.idx);
+		const msg = affectedComps.length
+			? __("Remove MOQ level and its {0} component row(s)?", [affectedComps.length])
+			: __("Remove this MOQ level?");
+
+		frappe.confirm(msg, () => {
+			remove_moq_row(frm, moqName);
+		});
+	});
+
+	// Component field changes
+	$w.find(".mc-price-input").on("change", function () {
+		const rowName = $(this).data("row");
+		const fieldname = $(this).data("field");
+		let value = $(this).val();
+
+		if (fieldname === "component") {
+			value = String(value).toUpperCase().replace(/[^A-Z]/g, "").slice(0, 1);
+			$(this).val(value);
+			frappe.model.set_value("Master Card Price Item", rowName, "component", value);
+		} else {
+			value = flt(value);
+			frappe.model.set_value("Master Card Price Item", rowName, fieldname, value).then(() => {
+				const row = locals["Master Card Price Item"] && locals["Master Card Price Item"][rowName];
+				if (!row) return;
+				const total = flt(row.material) + flt(row.labour) + flt(row.profit) + flt(row.ext_profit);
+				frappe.model.set_value("Master Card Price Item", rowName, "total", total).then(() => {
+					$w.find(`[data-total-row="${rowName}"]`).html(
+						format_price_currency(total, frm.doc.currency)
+					);
+				});
+			});
+		}
+		frm.dirty();
+	});
+}
+
+// ------------------------------------------------------------------
+// Row removal helpers — grids are hidden so we manipulate frm.doc directly
+// ------------------------------------------------------------------
+
+function remove_price_row(frm, rowName) {
+	frappe.model.clear_doc("Master Card Price Item", rowName);
+	const rows = frm.doc.price_items || [];
+	const i = rows.findIndex((r) => r.name === rowName);
+	if (i !== -1) rows.splice(i, 1);
+	rows.forEach((r, j) => { r.idx = j + 1; });
+	frm.dirty();
+	render_price_items_editor(frm);
+}
+
+function remove_moq_row(frm, moqName) {
+	const moqRows = frm.doc.moq_items || [];
+	const moqRow = moqRows.find((r) => r.name === moqName);
+	if (!moqRow) return;
+
+	// Remove all component rows for this MOQ level
+	const compRows = (frm.doc.price_items || []).filter((r) => r.moq_idx === moqRow.idx);
+	compRows.forEach((r) => frappe.model.clear_doc("Master Card Price Item", r.name));
+	frm.doc.price_items = (frm.doc.price_items || []).filter((r) => r.moq_idx !== moqRow.idx);
+	(frm.doc.price_items || []).forEach((r, j) => { r.idx = j + 1; });
+
+	// Remove the MOQ row itself
+	frappe.model.clear_doc("Master Card MOQ", moqName);
+	const i = moqRows.findIndex((r) => r.name === moqName);
+	if (i !== -1) moqRows.splice(i, 1);
+	moqRows.forEach((r, j) => { r.idx = j + 1; });
+
+	frm.dirty();
+	render_price_items_editor(frm);
 }
 
 function get_component_qty_map(frm) {
 	return (frm.doc.items || []).reduce((acc, row) => {
-		const component = (row.component || "").toUpperCase().trim();
-		if (component) {
-			acc[component] = flt(row.qty) || 1;
-		}
+		const comp = (row.component || "").toUpperCase().trim();
+		if (comp) acc[comp] = flt(row.qty) || 1;
 		return acc;
 	}, {});
 }

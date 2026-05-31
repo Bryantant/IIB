@@ -44,7 +44,7 @@ app_include_js = ["/assets/iib/js/desk_overrides.js"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Sales Order": "public/js/sales_order_jo_p2.js"}
+doctype_js = {"Sales Order": "public/js/sales_order_jo_converting.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -134,7 +134,11 @@ doctype_js = {"Sales Order": "public/js/sales_order_jo_p2.js"}
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {}
+doc_events = {
+	"Delivery Note": {
+		"before_save": "iib.iib.doctype.so_batch.so_batch.set_dn_po_line_no",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
@@ -244,10 +248,14 @@ doctype_js = {"Sales Order": "public/js/sales_order_jo_p2.js"}
 company_data_to_be_ignored = ["Master Card"]
 
 fixtures = [
+    {"dt": "Role", "filters": [["name", "in", ["IIB Manufacturing Manager"]]]},
     {"dt": "Property Setter", "filters": [["module", "=", "IIB"]]},
     {"dt": "Custom Field", "filters": [["module", "=", "IIB"]]},
     {"dt": "Client Script", "filters": [["module", "=", "IIB"]]},
     {"dt": "Server Script", "filters": [["module", "=", "IIB"]]},
-    {"dt": "Item Group", "filters": [["module", "=", "IIB"]]},
-    "Custom DocPerm",
+    {"dt": "Item Group", "filters": [["name", "in", ["Master Card", "Sub Assemblies", "Component"]]]},
+    "Translation",
+    # Custom DocPerm is managed by IIB Feature Control (iib_feature_control.py)
+    # and must NOT be stored as a fixture — bench migrate applies fixtures AFTER
+    # patches, which would re-create stale entries on top of the controller's work.
 ]

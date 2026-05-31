@@ -24,6 +24,7 @@
   "tab_item_price_set",
   "sec_price_items",
   "currency",
+  "moq_items",
   "price_items_html",
   "price_items",
   "tab_processes",
@@ -150,13 +151,21 @@
    "label": "Item Price Set"
   },
   {
+   "fieldname": "moq_items",
+   "fieldtype": "Table",
+   "hidden": 1,
+   "label": "MOQ Levels",
+   "options": "Master Card MOQ"
+  },
+  {
    "fieldname": "price_items_html",
    "fieldtype": "HTML",
-   "label": "Item Price Set Summary"
+   "label": "Item Price Set Editor"
   },
   {
    "fieldname": "price_items",
    "fieldtype": "Table",
+   "hidden": 1,
    "label": "Item Price Set",
    "options": "Master Card Price Item"
   },
@@ -208,6 +217,18 @@
    "print": 1,
    "read": 1,
    "role": "Manufacturing User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "IIB Manufacturing Manager",
    "share": 1,
    "write": 1
   }
