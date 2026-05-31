@@ -1,26 +1,41 @@
 [
  {
+  "docstatus": 0,
   "doctype": "Item Group",
+  "image": null,
   "is_group": 0,
+  "item_group_defaults": [],
   "item_group_name": "Master Card",
-  "module": "IIB",
+  "modified": "2026-05-31 00:22:53.457706",
   "name": "Master Card",
-  "parent_item_group": "All Item Groups"
+  "old_parent": "All Item Groups",
+  "parent_item_group": "All Item Groups",
+  "taxes": []
  },
  {
+  "docstatus": 0,
   "doctype": "Item Group",
+  "image": null,
   "is_group": 0,
+  "item_group_defaults": [],
   "item_group_name": "Sub Assemblies",
-  "module": "IIB",
+  "modified": "2026-05-31 00:22:53.471099",
   "name": "Sub Assemblies",
-  "parent_item_group": "All Item Groups"
+  "old_parent": "All Item Groups",
+  "parent_item_group": "All Item Groups",
+  "taxes": []
  },
  {
+  "docstatus": 0,
   "doctype": "Item Group",
+  "image": null,
   "is_group": 0,
+  "item_group_defaults": [],
   "item_group_name": "Component",
-  "module": "IIB",
+  "modified": "2026-05-31 00:22:53.479741",
   "name": "Component",
-  "parent_item_group": "All Item Groups"
+  "old_parent": "All Item Groups",
+  "parent_item_group": "All Item Groups",
+  "taxes": []
  }
 ]
