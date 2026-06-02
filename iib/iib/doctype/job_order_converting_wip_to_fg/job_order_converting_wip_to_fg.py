@@ -74,7 +74,7 @@ class JobOrderConvertingWIPtoFG(StockController):
 		self._cascade_to_job_order()
 
 	def on_cancel(self):
-		self.ignore_linked_doctypes = ("GL Entry", "Stock Ledger Entry")
+		self.ignore_linked_doctypes = ("GL Entry", "Stock Ledger Entry", "Job Order Converting")
 		self.update_stock_ledger()
 		self.make_gl_entries_on_cancel()
 		self.db_set("status", "Cancelled")
