@@ -19,10 +19,6 @@ frappe.ui.form.on("Master Card", {
 		calculate_price_rows(frm);
 		render_price_items_editor(frm);
 
-		// Force correct column definitions on the processes grid.
-		// Browser localStorage may cache an older schema, so patch docfields
-		// directly to match the server schema.
-		ensure_process_grid_columns(frm);
 		frm.trigger("render_process_tabs");
 
 		// Hide connections/links section (no BOMs linked anymore)
@@ -240,86 +236,6 @@ function filter_processes_grid(frm, letter) {
 			</div>`
 		);
 	}
-}
-
-// ------------------------------------------------------------------
-// Ensure processes grid always has the correct column definitions.
-// Browser localStorage may cache a stale schema, so the grid meta is patched
-// in-place before Frappe lays out the child table.
-// Fix: patch frappe.meta directly so grid.setup_fields() re-reads correctly.
-// columns must sum to ≤ 10:
-//   component(1)+sequence(1)+section(3)+est_time(2)+description(3) = 10
-// ------------------------------------------------------------------
-
-const PROCESS_GRID_COLUMNS = [
-	{ fieldname: "component",    label: "Comp",                fieldtype: "Data", in_list_view: 1, columns: 1, reqd: 1, read_only: 1, parent: "Master Card Process" },
-	{ fieldname: "sequence",     label: "Seq",                 fieldtype: "Int",  in_list_view: 1, columns: 1, reqd: 1, parent: "Master Card Process" },
-	{ fieldname: "section",      label: "Section Group",       fieldtype: "Link", in_list_view: 1, columns: 3, reqd: 1, options: "IIB Production Section", parent: "Master Card Process" },
-	{ fieldname: "est_time_mins",label: "Est Time (mins)",     fieldtype: "Int",  in_list_view: 1, columns: 2, parent: "Master Card Process" },
-	{ fieldname: "description",  label: "Description",         fieldtype: "Data", in_list_view: 1, columns: 3, parent: "Master Card Process" },
-	{ fieldname: "remarks",      label: "Remarks",             fieldtype: "Data", in_list_view: 0, parent: "Master Card Process" },
-];
-
-function ensure_process_grid_columns(frm) {
-	const DT = "Master Card Process";
-	const map = (frappe.meta.docfield_map || {})[DT] || {};
-
-	// 1. Patch frappe.meta.docfield_map (keyed by fieldname)
-	frappe.provide("frappe.meta.docfield_map." + DT);
-	PROCESS_GRID_COLUMNS.forEach((col) => {
-		const cur = frappe.meta.docfield_map[DT][col.fieldname];
-		if (cur) {
-			Object.assign(cur, col);
-		} else {
-			frappe.meta.docfield_map[DT][col.fieldname] = Object.assign({}, col);
-		}
-	});
-	if (map.machine) {
-		Object.assign(map.machine, { hidden: 1, in_list_view: 0, reqd: 0 });
-	}
-
-	// 2. Patch frappe.meta.docfield_list (ordered array)
-	if (!frappe.meta.docfield_list) frappe.meta.docfield_list = {};
-	const list = frappe.meta.docfield_list[DT] || [];
-	const ordered = PROCESS_GRID_COLUMNS.map((col) => {
-		const existing = list.find((f) => f.fieldname === col.fieldname);
-		return Object.assign(existing || {}, col);
-	});
-	list
-		.filter((f) => !PROCESS_GRID_COLUMNS.some((col) => col.fieldname === f.fieldname))
-		.forEach((f) => {
-			if (f.fieldname === "machine") {
-				Object.assign(f, { hidden: 1, in_list_view: 0, reqd: 0 });
-			}
-			ordered.push(f);
-		});
-	frappe.meta.docfield_list[DT] = ordered;
-
-	// 3. Patch locals['DocType'] so frappe.get_meta() is consistent
-	const meta = frappe.get_meta(DT);
-	if (meta) {
-		PROCESS_GRID_COLUMNS.forEach((col) => {
-			const f = (meta.fields || []).find((x) => x.fieldname === col.fieldname);
-			if (f) {
-				Object.assign(f, col);
-			} else {
-				meta.fields = meta.fields || [];
-				meta.fields.push(Object.assign({}, col));
-			}
-		});
-		const machine = (meta.fields || []).find((x) => x.fieldname === "machine");
-		if (machine) {
-			Object.assign(machine, { hidden: 1, in_list_view: 0, reqd: 0 });
-		}
-	}
-
-	// 4. Re-run setup_fields() so grid re-reads from the now-correct meta,
-	//    then rebuild the header row. Do NOT call grid.refresh() — that
-	//    would re-trigger setup_fields() and create a loop.
-	const grid = frm.fields_dict.processes && frm.fields_dict.processes.grid;
-	if (!grid) return;
-	grid.setup_fields();
-	grid.make_head();
 }
 
 function set_process_queries(frm) {
@@ -579,11 +495,6 @@ function get_component_qty_map(frm) {
 		if (comp) acc[comp] = flt(row.qty) || 1;
 		return acc;
 	}, {});
-}
-
-function format_qty(value) {
-	const qty = flt(value);
-	return Number.isInteger(qty) ? String(qty) : String(qty);
 }
 
 function apply_price_currency_formatters(frm) {

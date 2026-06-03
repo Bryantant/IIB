@@ -1,10 +1,18 @@
 import frappe
 from erpnext.accounts.utils import get_currency_precision
-from frappe.utils import flt
+from frappe.utils import flt, getdate
 from frappe.model.document import Document
 
 
 class SOBatch(Document):
+    def autoname(self):
+        from iib.iib.utils.naming import get_next_iib_number
+
+        d = getdate(self.transaction_date or frappe.utils.today())
+        yy = d.strftime("%y")
+        seq = get_next_iib_number("so_batch", period=yy, digits=5)
+        self.name = f"{yy}{seq}"
+
     def validate(self):
         if not self.company:
             self.company = frappe.db.get_single_value("Global Defaults", "default_company")
@@ -72,6 +80,7 @@ class SOBatch(Document):
                     "qty": row.qty,
                     "rate": expected_rate,
                     "component_rates": component_rates,
+                    "delivery_date": row.delivery_date,
                 }
             )
 
@@ -82,7 +91,9 @@ class SOBatch(Document):
             so.customer = self.customer
             so.order_type = "Sales"
             so.transaction_date = self.transaction_date
-            so.delivery_date = self.delivery_date
+            so.delivery_date = min(
+                getdate(i["delivery_date"]) for i in items if i.get("delivery_date")
+            )
             so.currency = self.currency
             so.conversion_rate = self.conversion_rate
             so.selling_price_list = selling_price_list
@@ -103,7 +114,7 @@ class SOBatch(Document):
                         "price_list_rate": item["rate"],
                         "discount_amount": 0,
                         "discount_percentage": 0,
-                        "delivery_date": self.delivery_date,
+                        "delivery_date": item["delivery_date"],
                         "warehouse": self.default_warehouse,
                     },
                 )

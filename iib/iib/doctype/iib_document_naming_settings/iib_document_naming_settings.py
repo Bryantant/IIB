@@ -4,5 +4,5 @@
 from frappe.model.document import Document
 
 
-class MasterCardRM(Document):
-	pass
+class IIBDocumentNamingSettings(Document):
+    pass

@@ -1,11 +1,19 @@
 import frappe
 from frappe import _
-from frappe.utils import flt, nowtime
+from frappe.utils import flt, getdate, nowtime
 
 from erpnext.controllers.stock_controller import StockController
 
 
 class FGTS(StockController):
+	def autoname(self):
+		from iib.iib.utils.naming import get_next_iib_number
+
+		d = getdate(self.posting_date or frappe.utils.today())
+		yymm = d.strftime("%y%m")
+		seq = get_next_iib_number("fgts", period=yymm, digits=5)
+		self.name = f"{yymm}{seq}"
+
 	"""Finished Goods Tracking System.
 
 	Two-phase stock movement:

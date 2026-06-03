@@ -3,9 +3,18 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import getdate
 
 
 class DailyProductionSchedule(Document):
+	def autoname(self):
+		from iib.iib.utils.naming import get_next_iib_number
+
+		d = getdate(self.posting_date or frappe.utils.today())
+		yymm = d.strftime("%y%m")
+		seq = get_next_iib_number("dps", period=yymm, digits=4)
+		self.name = f"{yymm}{seq}"
+
 	def validate(self):
 		self._block_duplicate()
 		self._update_last_update()

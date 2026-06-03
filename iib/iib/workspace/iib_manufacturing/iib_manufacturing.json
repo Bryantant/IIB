@@ -1,7 +1,7 @@
 {
  "charts": [],
- "content": "[{\"id\":\"kKvTm0sgRf\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">IIB Manufacturing</span>\",\"col\":12}},{\"id\":\"x3ljLc5JxT\",\"type\":\"card\",\"data\":{\"card_name\":\"Production\",\"col\":4}},{\"id\":\"4zKCbpzAS0\",\"type\":\"card\",\"data\":{\"card_name\":\"Master\",\"col\":4}},{\"id\":\"fwDT7Z0uH1\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}}]",
- "creation": "2026-05-29 16:35:35.547430",
+ "content": "[{\"id\":\"kKvTm0sgRf\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">IIB Manufacturing</span>\",\"col\":12}},{\"id\":\"j0lMbH09Ur\",\"type\":\"card\",\"data\":{\"card_name\":\"Trading\",\"col\":4}},{\"id\":\"x3ljLc5JxT\",\"type\":\"card\",\"data\":{\"card_name\":\"Production\",\"col\":4}},{\"id\":\"4zKCbpzAS0\",\"type\":\"card\",\"data\":{\"card_name\":\"Master\",\"col\":4}},{\"id\":\"fwDT7Z0uH1\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}}]",
+ "creation": "2026-06-02 11:48:39.060484",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -169,9 +169,48 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Trading",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "SO Batch",
+   "link_count": 0,
+   "link_to": "SO Batch",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order",
+   "link_count": 0,
+   "link_to": "Sales Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Delivery Note",
+   "link_count": 0,
+   "link_to": "Delivery Note",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-05-29 16:45:08.189236",
+ "modified": "2026-06-03 15:35:16.139982",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "IIB Manufacturing",

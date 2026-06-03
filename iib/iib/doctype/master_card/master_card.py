@@ -30,21 +30,17 @@ ITEM_SPEC_FIELDS = [
 
 class MasterCard(Document):
 	def autoname(self):
-		settings = frappe.get_single("IIB Settings")
-		next_number = int(settings.master_card_next_number or 1)
-
-		# Lock the row for concurrency
+		_SINGLETON = "IIB Document Naming Settings"
 		frappe.db.sql(
-			"select value from `tabSingles` where doctype=%s for update",
-			("IIB Settings",),
+			"SELECT value FROM `tabSingles` WHERE doctype=%s FOR UPDATE",
+			(_SINGLETON,),
 		)
-
+		next_number = int(
+			frappe.db.get_single_value(_SINGLETON, "master_card_next_number") or 1
+		)
 		while frappe.db.exists("Master Card", str(next_number)):
 			next_number += 1
-
-		frappe.db.set_single_value(
-			"IIB Settings", "master_card_next_number", next_number + 1
-		)
+		frappe.db.set_single_value(_SINGLETON, "master_card_next_number", next_number + 1)
 		self.name = str(next_number)
 
 	def before_save(self):
@@ -57,7 +53,6 @@ class MasterCard(Document):
 
 	def validate(self):
 		self._validate_components()
-		self._calculate_price_items()
 		self._validate_price_items()
 		self._validate_processes()
 
@@ -101,13 +96,14 @@ class MasterCard(Document):
 
 	def _ensure_bundle_item(self):
 		if frappe.db.exists("Item", self.name):
-			updates = {}
-			if self.description:
-				updates["item_name"] = self.description
-			if self.customer:
-				updates["linked_customer"] = self.customer
-			if updates:
-				frappe.db.set_value("Item", self.name, updates)
+			frappe.db.set_value(
+				"Item",
+				self.name,
+				{
+					"item_name": self.description or self.name,
+					"linked_customer": self.customer or None,
+				},
+			)
 			self.item_code = self.name
 			return
 
@@ -150,6 +146,17 @@ class MasterCard(Document):
 	def _validate_processes(self):
 		valid_components = {row.component.upper() for row in self.items if row.component}
 		seen = set()
+
+		unique_sections = {row.section for row in (self.processes or []) if row.section}
+		section_data = {}
+		if unique_sections:
+			rows = frappe.get_all(
+				"IIB Production Section",
+				filters={"name": ["in", list(unique_sections)]},
+				fields=["name", "is_group", "disabled"],
+			)
+			section_data = {r.name: r for r in rows}
+
 		for row in self.processes or []:
 			if not row.component:
 				frappe.throw(_("Process row {0}: Component is required.").format(row.idx))
@@ -163,7 +170,7 @@ class MasterCard(Document):
 			row.component = letter
 			if not row.sequence or row.sequence <= 0:
 				frappe.throw(_("Process row {0}: Sequence must be a positive integer.").format(row.idx))
-			self._validate_process_section_group(row)
+			self._validate_process_section_group(row, section_data)
 			key = (letter, row.sequence)
 			if key in seen:
 				frappe.throw(
@@ -208,16 +215,11 @@ class MasterCard(Document):
 				)
 			seen.add(key)
 
-	def _validate_process_section_group(self, row):
+	def _validate_process_section_group(self, row, section_data):
 		if not row.section:
 			frappe.throw(_("Process row {0}: Section Group is required.").format(row.idx))
 
-		section = frappe.db.get_value(
-			"IIB Production Section",
-			row.section,
-			["is_group", "disabled"],
-			as_dict=True,
-		)
+		section = section_data.get(row.section)
 		if not section:
 			frappe.throw(_("Process row {0}: Section Group {1} does not exist.").format(row.idx, row.section))
 		if section.disabled or not section.is_group:
@@ -242,7 +244,7 @@ class MasterCard(Document):
 			spec = {f: row.get(f) for f in ITEM_SPEC_FIELDS}
 
 			if frappe.db.exists("Item", row.item_code):
-				updates = {f: v for f, v in spec.items() if v}
+				updates = {f: v for f, v in spec.items() if v is not None}
 				if row.item_description:
 					updates["item_name"] = row.item_description
 				if row.uom:

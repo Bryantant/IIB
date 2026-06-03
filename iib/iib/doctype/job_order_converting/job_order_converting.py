@@ -264,6 +264,12 @@ def get_master_card_operations_for_item(production_item, master_card=None):
 
 
 class JobOrderConverting(Document):
+	def autoname(self):
+		from iib.iib.utils.naming import get_next_iib_number
+
+		seq = get_next_iib_number("jop2", period=None, digits=4)
+		self.name = f"JO{seq}"
+
 	def before_validate(self):
 		self.set(
 			"sales_order_items",

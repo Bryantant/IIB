@@ -1,12 +1,11 @@
 {
  "actions": [],
- "autoname": "naming_series:",
+ "autoname": "custom",
  "status_field": "status",
  "creation": "2026-05-20 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
   "company",
   "customer",
   "transaction_date",
@@ -26,13 +25,6 @@
   "amended_from"
  ],
  "fields": [
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Naming Series",
-   "options": "JOP1-.YY.-.#####",
-   "reqd": 1
-  },
   {
    "default": "PT. Interpak Industries Batam",
    "fieldname": "company",

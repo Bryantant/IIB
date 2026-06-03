@@ -137,6 +137,13 @@ doctype_js = {"Sales Order": "public/js/sales_order_jo_converting.js"}
 doc_events = {
 	"Delivery Note": {
 		"before_save": "iib.iib.doctype.so_batch.so_batch.set_dn_po_line_no",
+		"autoname": "iib.overrides.delivery_note.autoname",
+	},
+	"Sales Order": {
+		"autoname": "iib.overrides.sales_order.autoname",
+	},
+	"Purchase Order": {
+		"autoname": "iib.overrides.purchase_order.autoname",
 	},
 }
 

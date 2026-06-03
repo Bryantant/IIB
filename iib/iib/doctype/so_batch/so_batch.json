@@ -1,19 +1,17 @@
 {
  "actions": [],
- "autoname": "naming_series:",
- "creation": "2026-05-16 00:00:00.000000",
+ "autoname": "custom",
+ "creation": "2026-05-16 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
   "customer",
   "transaction_date",
-  "delivery_date",
   "column_break_header",
+  "payment_terms_template",
   "company",
   "currency",
   "conversion_rate",
-  "payment_terms_template",
   "default_warehouse",
   "section_break_items",
   "so_batch_items",
@@ -22,13 +20,6 @@
   "amended_from"
  ],
  "fields": [
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Naming Series",
-   "options": "SOB-.YY.-.#####",
-   "reqd": 1
-  },
   {
    "fieldname": "customer",
    "fieldtype": "Link",
@@ -47,23 +38,19 @@
    "reqd": 1
   },
   {
-   "fieldname": "delivery_date",
-   "fieldtype": "Date",
-   "label": "Delivery Date",
-   "reqd": 1
-  },
-  {
    "fieldname": "column_break_header",
    "fieldtype": "Column Break"
   },
   {
+   "default": "PT. Interpak Industries Batam",
    "fieldname": "company",
    "fieldtype": "Link",
+   "hidden": 1,
    "in_standard_filter": 1,
    "label": "Company",
    "options": "Company",
-   "reqd": 1,
-   "remember_last_selected_value": 1
+   "remember_last_selected_value": 1,
+   "reqd": 1
   },
   {
    "fieldname": "currency",
@@ -83,7 +70,7 @@
   {
    "fieldname": "payment_terms_template",
    "fieldtype": "Link",
-   "label": "Payment Terms Template",
+   "label": "Terms",
    "options": "Payment Terms Template",
    "reqd": 1
   },
@@ -91,6 +78,7 @@
    "default": "Stores - IIB",
    "fieldname": "default_warehouse",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Default Warehouse",
    "options": "Warehouse",
    "reqd": 1
@@ -132,11 +120,18 @@
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
- "modified": "2026-05-16 00:00:00.000000",
+ "links": [
+  {
+   "label": "Sales Order",
+   "link_doctype": "Sales Order",
+   "link_fieldname": "so_batch"
+  }
+ ],
+ "modified": "2026-06-03 19:14:28.728394",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "SO Batch",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -170,6 +165,8 @@
    "write": 1
   },
   {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -179,13 +176,13 @@
    "report": 1,
    "role": "IIB Manufacturing Manager",
    "share": 1,
-   "write": 1,
    "submit": 1,
-   "cancel": 1,
-   "amend": 1
+   "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
+ "states": [],
  "title_field": "customer"
 }

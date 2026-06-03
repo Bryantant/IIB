@@ -5,7 +5,7 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import flt, nowtime
+from frappe.utils import flt, getdate, nowtime
 
 from iib.iib.doctype.job_order_corrugator.job_order_corrugator import JOP1_TARGET_WAREHOUSE
 from iib.iib.utils.tolerance import lookup_tolerance
@@ -14,6 +14,14 @@ from erpnext.controllers.stock_controller import StockController
 
 
 class JobOrderCorrugatorReceipt(StockController):
+	def autoname(self):
+		from iib.iib.utils.naming import get_next_iib_number
+
+		d = getdate(self.posting_date or frappe.utils.today())
+		yy = d.strftime("%y")
+		seq = get_next_iib_number("jop1r", period=yy, digits=5)
+		self.name = f"IBJOP1{yy}{seq}"
+
 	def validate(self):
 		self.set_defaults()
 		self.validate_expense_account()

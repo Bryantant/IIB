@@ -5,7 +5,6 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "master_card_next_number",
   "section_bom_creator",
   "fg_item_group",
   "sub_assembly_item_group",
@@ -31,14 +30,6 @@
   "converting_tolerance"
  ],
  "fields": [
-  {
-   "fieldname": "master_card_next_number",
-   "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Master Card Next Number",
-   "non_negative": 1,
-   "reqd": 1
-  },
   {
    "fieldname": "section_bom_creator",
    "fieldtype": "Section Break",

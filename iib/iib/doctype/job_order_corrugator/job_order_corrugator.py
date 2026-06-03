@@ -4,7 +4,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
-from frappe.utils import flt
+from frappe.utils import flt, getdate
 
 from iib.iib.utils.tolerance import lookup_tolerance
 
@@ -13,6 +13,14 @@ JOP1_TARGET_WAREHOUSE = "Raw Material - IIB"
 
 
 class JobOrderCorrugator(Document):
+	def autoname(self):
+		from iib.iib.utils.naming import get_next_iib_number
+
+		d = getdate(self.transaction_date or frappe.utils.today())
+		yy = d.strftime("%y")
+		seq = get_next_iib_number("jop1", period=yy, digits=4)
+		self.name = f"IIB{yy}{seq}"
+
 	def validate(self):
 		self.set_defaults()
 		self.fetch_item_metadata()

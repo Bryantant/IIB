@@ -8,17 +8,19 @@
  "field_order": [
   "po_no",
   "po_date",
+  "delivery_date",
   "set_or_pcs",
   "part_no",
   "qty",
-  "rate",
   "line_no",
   "remark",
+  "rate",
   "resolved_item_code",
   "resolved_set_item_code"
  ],
  "fields": [
   {
+   "columns": 1,
    "fieldname": "po_no",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -26,6 +28,7 @@
    "reqd": 1
   },
   {
+   "columns": 1,
    "fieldname": "po_date",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -33,6 +36,15 @@
    "reqd": 1
   },
   {
+   "columns": 1,
+   "fieldname": "delivery_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Delivery Date",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
    "default": "Pcs",
    "fieldname": "set_or_pcs",
    "fieldtype": "Select",
@@ -42,6 +54,7 @@
    "reqd": 1
   },
   {
+   "columns": 2,
    "fieldname": "part_no",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -49,6 +62,7 @@
    "reqd": 1
   },
   {
+   "columns": 1,
    "fieldname": "qty",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -56,23 +70,26 @@
    "reqd": 1
   },
   {
-   "fieldname": "rate",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
-   "label": "Rate",
-   "precision": "4"
-  },
-  {
+   "columns": 1,
    "fieldname": "line_no",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Line No"
   },
   {
+   "columns": 2,
    "fieldname": "remark",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Remark"
+  },
+  {
+   "columns": 1,
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Rate",
+   "precision": "4"
   },
   {
    "fieldname": "resolved_item_code",
@@ -92,7 +109,7 @@
  "index_web_pages_for_search": 0,
  "istable": 1,
  "links": [],
- "modified": "2026-05-16 00:00:00.000000",
+ "modified": "2026-06-03 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "SO Batch Item",

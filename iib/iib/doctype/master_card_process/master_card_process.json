@@ -44,24 +44,25 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Est Time (mins)",
-   "columns": 1
+   "columns": 2
   },
   {
    "fieldname": "remarks",
    "fieldtype": "Data",
-   "label": "Remarks",
-   "columns": 3
+   "label": "Remarks"
   },
   {
+   "columns": 3,
    "fieldname": "description",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Description"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-05-21 00:00:00.000000",
+ "modified": "2026-06-03 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Master Card Process",
