@@ -186,8 +186,7 @@ function open_receipt_item_picker(frm, job_order_corrugators, filtered_children)
 				row.sales_order       = item.sales_order || "";
 				row.uom               = item.uom;
 				row.qty               = item.pending_qty;
-				row.basic_rate        = item.basic_rate;
-				row.amount            = flt(item.pending_qty) * flt(item.basic_rate);
+				row.amount            = 0;
 				row.target_warehouse  = item.target_warehouse;
 			});
 			frm.refresh_field("items");
@@ -199,22 +198,17 @@ function open_receipt_item_picker(frm, job_order_corrugators, filtered_children)
 	});
 }
 
-// Row-level: recompute amount on qty / basic_rate change
+// Row-level: recompute totals on qty change
 frappe.ui.form.on("Job Order Corrugator Receipt Item", {
-	qty: recompute_amount,
-	basic_rate: recompute_amount,
+	qty: recompute_totals,
 });
 
-function recompute_amount(frm, cdt, cdn) {
-	const row = locals[cdt][cdn];
-	frappe.model.set_value(cdt, cdn, "amount", flt(row.qty) * flt(row.basic_rate));
-	// Refresh header totals
+function recompute_totals(frm, cdt, cdn) {
+	frappe.model.set_value(cdt, cdn, "amount", 0);
 	let total_qty = 0;
-	let total_amount = 0;
 	(frm.doc.items || []).forEach((r) => {
 		total_qty += flt(r.qty);
-		total_amount += flt(r.amount);
 	});
 	frm.set_value("total_qty", total_qty);
-	frm.set_value("total_amount", total_amount);
+	frm.set_value("total_amount", 0);
 }

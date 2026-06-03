@@ -677,11 +677,7 @@ class JobOrderConverting(Document):
 		if flt(self.qty) <= 0:
 			frappe.throw(_("Qty to Convert must be greater than 0"))
 
-		item_data = frappe.db.get_value(
-			"Item", self.production_item, ["stock_uom", "valuation_rate"], as_dict=True
-		) or {}
-		stock_uom = item_data.get("stock_uom") or ""
-		basic_rate = flt(item_data.get("valuation_rate") or 0)
+		stock_uom = frappe.db.get_value("Item", self.production_item, "stock_uom") or ""
 
 		doc = frappe.new_doc("Job Order Converting RM to WIP")
 		doc.company = self.company
@@ -695,7 +691,7 @@ class JobOrderConverting(Document):
 				"item_code": self.production_item,
 				"qty": flt(self.qty),
 				"uom": stock_uom,
-				"basic_rate": basic_rate,
+				"basic_rate": 0,
 			},
 		)
 		doc.insert(ignore_permissions=True)

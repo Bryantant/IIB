@@ -60,13 +60,12 @@
    "read_only": 1
   },
   {
-   "fetch_from": "item_code.custom_basic_rate",
+   "fetch_from": "item_code.valuation_rate",
    "fetch_if_empty": 1,
    "fieldname": "basic_rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Basic Rate",
-   "reqd": 1
+   "label": "Basic Rate"
   },
   {
    "fieldname": "qty",

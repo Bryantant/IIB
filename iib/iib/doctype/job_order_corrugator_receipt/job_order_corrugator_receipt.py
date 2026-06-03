@@ -82,8 +82,8 @@ class JobOrderCorrugatorReceipt(StockController):
 				frappe.throw(_("Row {0}: Quantity must be positive").format(row.idx))
 			if not row.target_warehouse:
 				frappe.throw(_("Row {0}: Target Warehouse is required").format(row.idx))
-			if flt(row.basic_rate) <= 0:
-				frappe.throw(_("Row {0}: Basic Rate is required").format(row.idx))
+			if flt(row.basic_rate) < 0:
+				frappe.throw(_("Row {0}: Basic Rate cannot be negative").format(row.idx))
 			# Ensure linked JOP1 is submitted
 			if row.job_order_corrugator:
 				docstatus = frappe.db.get_value("Job Order Corrugator", row.job_order_corrugator, "docstatus")
@@ -91,7 +91,7 @@ class JobOrderCorrugatorReceipt(StockController):
 					frappe.throw(
 						_("Row {0}: Job Order Corrugator {1} is not submitted").format(row.idx, row.job_order_corrugator)
 					)
-			row.amount = flt(row.qty) * flt(row.basic_rate)
+			row.amount = 0
 
 	def validate_stock_item_and_uom(self, row):
 		if not row.item_code:
@@ -281,7 +281,7 @@ class JobOrderCorrugatorReceipt(StockController):
 					d,
 					{
 						"actual_qty": flt(d.qty),
-						"incoming_rate": flt(d.basic_rate),
+						"incoming_rate": 0,
 						"warehouse": d.target_warehouse,
 					},
 				)
@@ -299,8 +299,8 @@ class JobOrderCorrugatorReceipt(StockController):
 
 		gl_entries = []
 		for d in self.get("items"):
-			amount = flt(d.qty) * flt(d.basic_rate)
-			if not amount or not d.target_warehouse:
+			amount = 0
+			if not d.target_warehouse:
 				continue
 
 			if warehouse_account:
@@ -415,9 +415,6 @@ def get_corrugator_items_for_receipt_dialog(job_order_corrugators, filtered_chil
 			continue
 		r["pending_qty"] = pending        # used as row.qty when added to receipt
 		r["received_qty"] = received_qty  # shown in "JO P1 Receipt" column
-		r["basic_rate"] = (
-			frappe.db.get_value("Item", r["item_code"], "custom_basic_rate") or 0
-		)
 		r["target_warehouse"] = JOP1_TARGET_WAREHOUSE
 		output.append(r)
 	return output
@@ -453,9 +450,6 @@ def get_corrugator_items(job_order_corrugators):
 		if pending <= 0:
 			continue
 		r["qty"] = pending
-		r["basic_rate"] = (
-			frappe.db.get_value("Item", r["item_code"], "custom_basic_rate") or 0
-		)
 		r["target_warehouse"] = JOP1_TARGET_WAREHOUSE
 		output.append(r)
 	return output

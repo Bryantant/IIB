@@ -198,7 +198,7 @@ class FGTS(StockController):
 				d,
 				{
 					"actual_qty": flt(self.total_qty),
-					"incoming_rate": flt(row.basic_rate),
+					"incoming_rate": 0,
 					"warehouse": to_warehouse,
 				},
 			)
@@ -211,8 +211,7 @@ class FGTS(StockController):
 	def _make_gl_entries(self, from_warehouse, to_warehouse, remarks_prefix="Transfer"):
 		from erpnext.accounts.general_ledger import process_gl_map
 
-		# Aggregate: each row's basic_rate × header total_qty
-		total_amount = sum(flt(row.basic_rate) * flt(self.total_qty) for row in self.items)
+		total_amount = 0
 		if not total_amount:
 			return
 
@@ -330,8 +329,6 @@ def _build_entry(customer, item_code, item_name, wip_warehouse, fg_warehouse):
 	master_card = (mc_item or {}).get("parent") or ""
 	component = (mc_item or {}).get("component") or ""
 
-	basic_rate = flt(frappe.db.get_value("Item", item_code, "custom_basic_rate") or 0)
-
 	return {
 		"customer": customer,
 		"item_code": item_code,
@@ -341,7 +338,6 @@ def _build_entry(customer, item_code, item_name, wip_warehouse, fg_warehouse):
 		"wip_warehouse": wip_warehouse,
 		"fg_warehouse": fg_warehouse,
 		"stores_warehouse": "Stores - IIB",
-		"basic_rate": basic_rate,
 	}
 
 

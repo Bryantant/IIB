@@ -24,7 +24,6 @@ ITEM_SPEC_FIELDS = [
 	"custom_flute",
 	"custom_remarks",
 	"custom_weight",
-	"custom_basic_rate",
 ]
 
 

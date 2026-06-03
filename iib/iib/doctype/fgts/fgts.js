@@ -88,7 +88,6 @@ frappe.ui.form.on("FGTS", {
 			item_name:   selected.item_name || "",
 			master_card: selected.master_card || "",
 			component:   selected.component || "",
-			basic_rate:  selected.basic_rate || 0,
 		});
 		frm.refresh_field("items");
 

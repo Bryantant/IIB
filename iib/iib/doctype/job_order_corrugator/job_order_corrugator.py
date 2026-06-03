@@ -417,9 +417,6 @@ def make_corrugator_receipt(source_name, target_doc=None):
 		target_row.job_order_corrugator = source_parent.name
 		target_row.job_order_corrugator_item = source_row.name
 		target_row.target_warehouse = JOP1_TARGET_WAREHOUSE
-		target_row.basic_rate = (
-			frappe.db.get_value("Item", source_row.item_code, "custom_basic_rate") or 0
-		)
 
 	doc = get_mapped_doc(
 		"Job Order Corrugator",

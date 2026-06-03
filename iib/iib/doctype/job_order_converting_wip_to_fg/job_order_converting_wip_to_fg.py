@@ -53,8 +53,8 @@ class JobOrderConvertingWIPtoFG(StockController):
 				frappe.throw(_("Row {0}: Item Code is required").format(row.idx))
 			if flt(row.qty) <= 0:
 				frappe.throw(_("Row {0}: Quantity must be positive").format(row.idx))
-			if flt(row.basic_rate) <= 0:
-				frappe.throw(_("Row {0}: Basic Rate must be positive").format(row.idx))
+			if flt(row.basic_rate) < 0:
+				frappe.throw(_("Row {0}: Basic Rate cannot be negative").format(row.idx))
 			item = frappe.db.get_value(
 				"Item", row.item_code, ["item_name", "stock_uom"], as_dict=True
 			)
