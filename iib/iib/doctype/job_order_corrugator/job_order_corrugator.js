@@ -31,6 +31,14 @@ frappe.ui.form.on("Job Order Corrugator", {
 	transaction_date(frm) {
 		restrict_required_date(frm);
 	},
+	required_date(frm) {
+		if (!frm.doc.required_date) return;
+		(frm.doc.items || []).forEach((row) => {
+			if (!row.required_date) {
+				frappe.model.set_value(row.doctype, row.name, "required_date", frm.doc.required_date);
+			}
+		});
+	},
 });
 
 // ---------------------------------------------------------------------------
@@ -38,6 +46,14 @@ frappe.ui.form.on("Job Order Corrugator", {
 // ---------------------------------------------------------------------------
 
 frappe.ui.form.on("Job Order Corrugator Item", {
+	required_date(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (!row.required_date) return;
+		if (frm.doc.transaction_date && row.required_date < frm.doc.transaction_date) {
+			frappe.model.set_value(cdt, cdn, "required_date", "");
+			frappe.throw(__("Row " + row.idx + ": Required Date cannot be before Transaction Date."));
+		}
+	},
 	// When SO changes, clear dependent fields so filters reapply cleanly
 	sales_order(frm, cdt, cdn) {
 		frappe.model.set_value(cdt, cdn, "sales_order_item", null);
