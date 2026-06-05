@@ -26,6 +26,7 @@ frappe.ui.form.on("Job Order Converting", {
 		ensure_sales_order_items_table_is_optional(frm);
 		remove_blank_so_item_rows(frm);
 		remember_production_item(frm);
+		refresh_on_hand_qty(frm);
 	},
 
 	refresh(frm) {
@@ -35,12 +36,53 @@ frappe.ui.form.on("Job Order Converting", {
 			remember_production_item(frm);
 		}
 		set_status_indicator(frm);
-		add_get_items_button(frm);
+		["sales_order_items", "operations"].forEach((f) => {
+			frm.fields_dict[f]?.grid?.wrapper?.find(".grid-add-row").hide();
+		});
 		add_start_button(frm);
 		add_view_button(frm);
 		add_stop_button(frm);
 		add_close_button(frm);
 		add_return_components_button(frm);
+	},
+
+	get_sales_orders(frm) {
+		if (!frm.doc.production_item) {
+			frappe.msgprint({
+				message: __("Please set <b>MC Component</b> before fetching Sales Orders."),
+				indicator: "orange",
+			});
+			return;
+		}
+		frappe.call({
+			method: "iib.iib.doctype.job_order_converting.job_order_converting.fetch_all_so_items_for_converting",
+			args: {
+				production_item: frm.doc.production_item,
+				customer: frm.doc.customer || "",
+				target_doc: frm.doc,
+			},
+			freeze: true,
+			freeze_message: __("Fetching Sales Orders..."),
+			callback(r) {
+				if (!r.message) return;
+				frappe.model.clear_table(frm.doc, "sales_order_items");
+				(r.message.sales_order_items || []).forEach((row) => {
+					const new_row = frappe.model.add_child(frm.doc, "sales_order_items");
+					Object.assign(new_row, {
+						sales_order: row.sales_order,
+						sales_order_item: row.sales_order_item,
+						item_code: row.item_code,
+						qty: row.qty,
+						so_date: row.so_date,
+						po_no: row.po_no,
+						po_date: row.po_date,
+						uom: row.uom,
+						remark: row.remark || "",
+					});
+				});
+				frm.refresh_field("sales_order_items");
+			},
+		});
 	},
 
 	production_item(frm) {
@@ -58,6 +100,7 @@ frappe.ui.form.on("Job Order Converting", {
 		filter_sales_order_rows_for_item(frm, production_item);
 		populate_operations_from_item(frm, frm.doc.production_item);
 		remember_production_item(frm);
+		refresh_on_hand_qty(frm);
 	},
 });
 
@@ -84,67 +127,6 @@ function set_status_indicator(frm) {
 	if (frm.doc.status) {
 		frm.page.set_indicator(frm.doc.status, colors[frm.doc.status] || "blue");
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Get Items From → Sales Order  (erpnext.utils.map_current_doc with checkbox)
-// ---------------------------------------------------------------------------
-//
-// Delivery Note pattern: allows user to toggle "Select Sales Order Item" checkbox
-// to switch between parent (Sales Order) and child (Packed Item) selection modes.
-// No MC Component requirement — filter applied server-side.
-
-function add_get_items_button(frm) {
-	if (frm.doc.docstatus !== 0) return;
-	frm.add_custom_button(
-		__("Sales Order"),
-		() => {
-			// MC Component must be set first — same pattern as Sales Invoice requiring Customer
-			if (!frm.doc.production_item) {
-				frappe.msgprint({
-					title: __("MC Component Required"),
-					message: __(
-						"Please set the <b>MC Component</b> before fetching from Sales Order."
-					),
-					indicator: "orange",
-				});
-				return;
-			}
-
-			// Setters as an array so we can define custom fields not on the Sales Order schema:
-			//   • MC No  — read-only display of the current MC Component being filtered
-			//   • Customer — optional link filter to narrow SOs by customer
-			erpnext.utils.map_current_doc({
-				method: "iib.iib.doctype.job_order_converting.job_order_converting.get_items_from_so_for_converting",
-				source_doctype: "Sales Order",
-				target: frm,
-				date_field: "transaction_date",
-				setters: [
-					{
-						fieldtype: "Data",
-						label: __("MC No"),
-						fieldname: "mc_no",
-						read_only: 1,
-						default: frm.doc.production_item,
-					},
-					{
-						fieldtype: "Link",
-						label: __("Customer"),
-						fieldname: "customer",
-						options: "Customer",
-					},
-				],
-				allow_child_item_selection: true,
-				child_fieldname: "packed_items",
-				child_columns: ["item_code", "item_name", "qty", "custom_wip_quantity"],
-				// Custom query: only SOs containing a packed item matching production_item
-				get_query_method:
-					"iib.iib.doctype.job_order_converting.job_order_converting.get_so_query_for_production_item",
-				get_query_filters: { production_item: frm.doc.production_item },
-			});
-		},
-		__("Get Items From")
-	);
 }
 
 function ensure_sales_order_items_table_is_optional(frm) {
@@ -183,6 +165,20 @@ function is_blank_so_item_row(row) {
 		!row.so_status &&
 		!flt(row.qty)
 	);
+}
+
+function refresh_on_hand_qty(frm) {
+	if (!frm.doc.production_item) {
+		frm.set_value("on_hand_qty", 0);
+		return;
+	}
+	frappe.call({
+		method: "iib.iib.doctype.job_order_converting.job_order_converting.get_item_on_hand_qty",
+		args: { item_code: frm.doc.production_item },
+		callback(r) {
+			frm.set_value("on_hand_qty", r.message || 0);
+		},
+	});
 }
 
 function remember_production_item(frm) {

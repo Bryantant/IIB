@@ -23,6 +23,7 @@
   "jop1r_current_period",
   "jop1r_next_number",
   "section_jop2",
+  "jop2_current_period",
   "jop2_next_number",
   "section_production",
   "dps_current_period",
@@ -152,6 +153,12 @@
    "fieldname": "section_jop2",
    "fieldtype": "Section Break",
    "label": "Job Order Converting"
+  },
+  {
+   "fieldname": "jop2_current_period",
+   "fieldtype": "Data",
+   "label": "JOP2 Current Period",
+   "read_only": 1
   },
   {
    "default": "1",

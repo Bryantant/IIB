@@ -933,28 +933,44 @@ def get_operations_for_item(production_item):
 
 
 @frappe.whitelist()
+def get_item_on_hand_qty(item_code):
+	"""Return current actual_qty for item_code from the Stores warehouse."""
+	if not item_code:
+		return 0
+	return flt(
+		frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": "Stores - IIB"}, "actual_qty")
+	)
+
+
+@frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_so_query_for_production_item(doctype, txt, searchfield, start, page_len, filters):
-	"""Link query: return submitted, active Sales Orders that have a Packed Item
-	matching the given production_item. Used by the Get Items From picker when
-	MC Component is already set so users only see relevant SOs."""
-	# production_item may come from get_query_filters or from the mc_no setter value
+	"""Link query: return submitted, active Sales Orders whose production_item appears
+	in either tabPacked Item (bundle SO) or tabSales Order Item (non-bundle SO)."""
 	production_item = filters.get("production_item") or filters.get("mc_no") or ""
 	customer = filters.get("customer") or ""
 
-	# Build optional customer clause (parametrised — no injection risk)
 	customer_clause = "AND so.customer = %(customer)s" if customer else ""
 
 	return frappe.db.sql(
 		f"""
-		SELECT DISTINCT so.name, pi.item_code AS mc_no, so.customer, so.transaction_date
+		SELECT so.name, %(production_item)s AS mc_no, so.customer, so.transaction_date
 		FROM `tabSales Order` so
-		JOIN `tabPacked Item` pi ON pi.parent = so.name
 		WHERE so.docstatus = 1
 		  AND so.status NOT IN ('Stopped', 'Closed', 'Cancelled')
-		  AND pi.item_code = %(production_item)s
 		  {customer_clause}
 		  AND (so.name LIKE %(txt)s OR so.customer LIKE %(txt)s)
+		  AND (
+		    EXISTS (
+		      SELECT 1 FROM `tabPacked Item` pi
+		      WHERE pi.parent = so.name AND pi.item_code = %(production_item)s
+		    )
+		    OR
+		    EXISTS (
+		      SELECT 1 FROM `tabSales Order Item` soi
+		      WHERE soi.parent = so.name AND soi.item_code = %(production_item)s
+		    )
+		  )
 		ORDER BY so.transaction_date DESC
 		LIMIT %(page_len)s OFFSET %(start)s
 		""",
@@ -970,20 +986,74 @@ def get_so_query_for_production_item(doctype, txt, searchfield, start, page_len,
 
 
 @frappe.whitelist()
-def get_items_from_so_for_converting(source_name, target_doc=None, kwargs=None):
-	"""Mapper for map_current_doc with allow_child_item_selection: true.
+def fetch_all_so_items_for_converting(production_item, customer=None, target_doc=None):
+	"""Fetch all outstanding SO items matching production_item (and optionally customer)
+	into the JOP2's sales_order_items table. Replaces any existing rows.
+	Supports both bundle SOs (packed items) and plain SOs (SO items).
+	"""
+	frappe.has_permission("Job Order Converting", "read", throw=True)
+	frappe.has_permission("Sales Order", "read", throw=True)
 
-	Adds Packed Item rows from a Sales Order to the JO P2's sales_order_items table.
-	Silently filters by production_item (skip non-matching rows). Respects
-	allow_child_item_selection via kwargs.filtered_children.
+	customer_clause = "AND so.customer = %(customer)s" if customer else ""
+	so_names = frappe.db.sql_list(
+		f"""
+		SELECT so.name FROM `tabSales Order` so
+		WHERE so.docstatus = 1
+		  AND so.status NOT IN ('Stopped', 'Closed', 'Cancelled')
+		  {customer_clause}
+		  AND (
+		    EXISTS (
+		      SELECT 1 FROM `tabPacked Item` pi
+		      WHERE pi.parent = so.name AND pi.item_code = %(production_item)s
+		    )
+		    OR
+		    EXISTS (
+		      SELECT 1 FROM `tabSales Order Item` soi
+		      WHERE soi.parent = so.name AND soi.item_code = %(production_item)s
+		    )
+		  )
+		ORDER BY so.transaction_date DESC
+		""",
+		{"production_item": production_item, "customer": customer or ""},
+	)
 
-	Args:
-		source_name: the Sales Order name.
-		target_doc: the JO P2 document (dict or Document object).
-		kwargs: optional dict with filtered_children list (from allow_child_item_selection).
+	if isinstance(target_doc, str):
+		target_doc = frappe.get_doc(json.loads(target_doc))
+	elif isinstance(target_doc, dict):
+		target_doc = frappe.get_doc(target_doc)
+	elif target_doc is None:
+		target_doc = frappe.new_doc("Job Order Converting")
 
-	Returns:
-		The mutated target_doc.
+	target_doc.sales_order_items = []
+
+	total_rows = 0
+	for so_name in so_names:
+		before = len(target_doc.sales_order_items)
+		get_items_from_so_for_converting(so_name, target_doc, suppress_msg=True)
+		total_rows += len(target_doc.sales_order_items) - before
+
+	if total_rows == 0:
+		frappe.msgprint(
+			_("No outstanding items found for <b>{0}</b>.").format(production_item),
+			indicator="orange",
+		)
+	else:
+		frappe.msgprint(
+			_("{0} item(s) added from {1} Sales Order(s).").format(total_rows, len(so_names)),
+			indicator="green",
+			alert=True,
+		)
+
+	return target_doc
+
+
+@frappe.whitelist()
+def get_items_from_so_for_converting(source_name, target_doc=None, kwargs=None, suppress_msg=False):
+	"""Mapper — adds items from one Sales Order into the JOP2's sales_order_items table.
+
+	Supports both bundle and non-bundle Sales Orders. For bundle SOs the relevant rows
+	are Packed Items; for plain SOs they are Sales Order Items. Bundle path takes priority
+	when both exist on the same SO.
 	"""
 	frappe.has_permission("Job Order Converting", "read", throw=True)
 	frappe.has_permission("Sales Order", "read", throw=True)
@@ -1009,22 +1079,39 @@ def get_items_from_so_for_converting(source_name, target_doc=None, kwargs=None):
 		target_doc.get("name") if target_doc.get("docstatus") == 0 else None
 	)
 
-	# Get filtered_children if in child-selection mode (user selected specific Packed Items)
+	# Get filtered_children if in child-selection mode (user selected specific rows)
 	filtered_children = kwargs.get("filtered_children") or []
 
 	# Ensure sales_order_items exists
 	if not target_doc.sales_order_items:
 		target_doc.sales_order_items = []
 
-	# Walk packed_items, applying filters
+	# Fetch Master Card remark for the production_item once (shared across all rows)
+	mc_remark = ""
+	if production_item:
+		mc_name = frappe.db.get_value("Master Card Item", {"item_code": production_item}, "parent")
+		if mc_name:
+			mc_remark = frappe.db.get_value("Master Card", mc_name, "remark") or ""
+
+	# Bundle SOs: production_item appears as a packed component in tabPacked Item.
+	# Non-bundle SOs: production_item appears directly in tabSales Order Item.
+	# Bundle path takes priority — if packed candidates exist, use them exclusively.
+	packed_candidates = [
+		pi for pi in (source.packed_items or [])
+		if not production_item or pi.item_code == production_item
+	]
+	if packed_candidates:
+		candidate_rows = packed_candidates
+	else:
+		candidate_rows = [
+			soi for soi in (source.items or [])
+			if not production_item or soi.item_code == production_item
+		]
+
 	rows_added = 0
 	first_item_code = None
-	for pi_row in source.packed_items or []:
-		# Silent filter 1: production_item mismatch
-		if production_item and pi_row.item_code != production_item:
-			continue
-
-		# Silent filter 2: child-selection mode and not in filtered list
+	for pi_row in candidate_rows:
+		# Silent filter: child-selection mode and not in filtered list
 		if filtered_children and pi_row.name not in filtered_children:
 			continue
 
@@ -1046,18 +1133,16 @@ def get_items_from_so_for_converting(source_name, target_doc=None, kwargs=None):
 		if existing:
 			continue
 
-		# Resolve delivery_date from parent Sales Order Item
-		details = get_so_line_details(pi_row.name) or frappe._dict()
-
-		# Add to target's sales_order_items
 		target_doc.append("sales_order_items", {
 			"sales_order": source_name,
 			"sales_order_item": pi_row.name,
 			"item_code": pi_row.item_code,
 			"qty": open_qty,
-			"delivery_date": details.get("delivery_date"),
-			"customer": source.customer,
-			"so_status": source.status,
+			"so_date": source.transaction_date,
+			"po_no": source.get("po_no") or "",
+			"po_date": source.get("po_date") or None,
+			"uom": pi_row.uom,
+			"remark": mc_remark,
 		})
 		if first_item_code is None:
 			first_item_code = pi_row.item_code
@@ -1067,11 +1152,11 @@ def get_items_from_so_for_converting(source_name, target_doc=None, kwargs=None):
 	if rows_added > 0 and first_item_code and not target_doc.get("production_item"):
 		target_doc.production_item = first_item_code
 
-	if rows_added == 0:
+	if rows_added == 0 and not suppress_msg:
 		item_label = production_item or _("any item")
 		frappe.msgprint(
-			_("No open Packed Items found for <b>{0}</b> in {1}. "
-			  "Either the item is not in this Sales Order's packed items, "
+			_("No open items found for <b>{0}</b> in {1}. "
+			  "Either the item is not in this Sales Order, "
 			  "or the full quantity is already allocated.").format(item_label, source_name),
 			title=_("No Items Added"),
 			indicator="orange",

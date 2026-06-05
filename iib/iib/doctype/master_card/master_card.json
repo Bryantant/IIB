@@ -10,6 +10,7 @@
   "item_code",
   "customer",
   "description",
+  "remark",
   "col_break_header",
   "disabled",
   "company",
@@ -44,6 +45,11 @@
    "in_list_view": 1,
    "label": "MC Number",
    "no_copy": 1
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Small Text",
+   "label": "Remark"
   },
   {
    "fieldname": "col_break_header",

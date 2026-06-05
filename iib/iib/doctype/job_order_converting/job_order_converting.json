@@ -7,7 +7,12 @@
  "field_order": [
   "company",
   "ppp2_item_row",
+  "section_break_zinb",
+  "customer",
   "production_item",
+  "on_hand_qty",
+  "get_sales_orders",
+  "sec_so_filter",
   "item_name",
   "description",
   "master_card",
@@ -55,12 +60,33 @@
    "read_only": 1
   },
   {
+   "fieldname": "sec_so_filter",
+   "fieldtype": "Section Break"
+  },
+  {
    "fieldname": "production_item",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "MC Component",
    "options": "Item",
    "reqd": 1
+  },
+  {
+   "fieldname": "on_hand_qty",
+   "fieldtype": "Float",
+   "label": "On Hand Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "get_sales_orders",
+   "fieldtype": "Button",
+   "label": "Get Sales Orders"
   },
   {
    "fieldname": "item_name",
@@ -95,6 +121,7 @@
    "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
+   "hidden": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
@@ -174,18 +201,19 @@
    "default": "0",
    "fieldname": "oh_qty",
    "fieldtype": "Float",
-   "label": "OH (Raw Material)",
+   "label": "Qty RM",
    "read_only": 1
   },
   {
    "fieldname": "sec_so_items",
    "fieldtype": "Section Break",
-   "label": "Sales Orders"
+   "label": "Job Order Converting Items"
   },
   {
+   "cannot_add_rows": 1,
    "fieldname": "sales_order_items",
    "fieldtype": "Table",
-   "label": "Sales Order Items",
+   "label": "Job Order Converting Items",
    "options": "Job Order Converting Sales Order Item"
   },
   {
@@ -194,6 +222,7 @@
    "label": "Operations"
   },
   {
+   "cannot_add_rows": 1,
    "fieldname": "operations",
    "fieldtype": "Table",
    "label": "Operations",
@@ -243,12 +272,16 @@
    "options": "Job Order Converting",
    "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_zinb",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-30 18:30:28.589358",
+ "modified": "2026-06-05 17:56:25.643237",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order Converting",
