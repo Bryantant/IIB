@@ -1,36 +1,35 @@
 {
  "actions": [],
- "autoname": "field:colour_name",
- "creation": "2026-05-28 00:00:00",
+ "autoname": "field:pic_name",
+ "creation": "2026-06-04 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "colour_name",
-  "colour_group"
+  "pic_name",
+  "pic_number"
  ],
  "fields": [
   {
-   "fieldname": "colour_name",
+   "fieldname": "pic_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Colour Name",
+   "label": "PIC Name",
    "reqd": 1,
    "unique": 1
   },
   {
-   "fieldname": "colour_group",
-   "fieldtype": "Select",
+   "fieldname": "pic_number",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Colour Group",
-   "options": "\nColour 1\nColour 2\nColour 3\nColour 4\nColour 5"
+   "label": "PIC Number"
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-05-28 00:00:00.000000",
+ "modified": "2026-06-04 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "IIB",
- "name": "Colour",
+ "name": "MC PIC",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
@@ -76,7 +75,7 @@
   }
  ],
  "row_format": "Dynamic",
- "sort_field": "colour_name",
+ "sort_field": "pic_name",
  "sort_order": "ASC",
  "states": []
 }

@@ -34,8 +34,8 @@ frappe.ui.form.on("Job Order Corrugator", {
 	required_date(frm) {
 		if (!frm.doc.required_date) return;
 		(frm.doc.items || []).forEach((row) => {
-			if (!row.required_date) {
-				frappe.model.set_value(row.doctype, row.name, "required_date", frm.doc.required_date);
+			if (!row.due_date) {
+				frappe.model.set_value(row.doctype, row.name, "due_date", frm.doc.required_date);
 			}
 		});
 	},
@@ -46,12 +46,12 @@ frappe.ui.form.on("Job Order Corrugator", {
 // ---------------------------------------------------------------------------
 
 frappe.ui.form.on("Job Order Corrugator Item", {
-	required_date(frm, cdt, cdn) {
+	due_date(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
-		if (!row.required_date) return;
-		if (frm.doc.transaction_date && row.required_date < frm.doc.transaction_date) {
-			frappe.model.set_value(cdt, cdn, "required_date", "");
-			frappe.throw(__("Row " + row.idx + ": Required Date cannot be before Transaction Date."));
+		if (!row.due_date) return;
+		if (frm.doc.transaction_date && row.due_date < frm.doc.transaction_date) {
+			frappe.model.set_value(cdt, cdn, "due_date", "");
+			frappe.throw(__("Row " + row.idx + ": Due Date cannot be before Transaction Date."));
 		}
 	},
 	// When SO changes, clear dependent fields so filters reapply cleanly
@@ -135,29 +135,7 @@ function add_get_items_button(frm) {
 					].map((name) => ({ name, editable: false }));
 				};
 
-				// Re-fetch child results whenever a setter changes while in child mode.
-				// Patch df.onchange (Frappe's internal hook) since Link/Date fields
-				// set values programmatically and don't reliably fire raw DOM change events.
-				setTimeout(() => {
-					const refresh = frappe.utils.debounce(() => {
-						if (d.is_child_selection_enabled?.()) d.show_child_results?.();
-					}, 300);
-
-					["customer", "transaction_date"].forEach((fieldname) => {
-						const field = d.dialog.fields_dict[fieldname];
-						if (!field) return;
-						const orig = field.df.onchange;
-						field.df.onchange = function () {
-							orig?.call(this);
-							refresh();
-						};
-					});
-
-					const search_field = d.dialog.fields_dict["search_term"];
-					if (search_field) {
-						search_field.$input?.on("input.iib_child", refresh);
-					}
-				}, 500);
+				patch_dialog_filter_refresh(d);
 			}
 		},
 		__("Get Items From")
@@ -214,6 +192,38 @@ function set_status(frm, status) {
 			frm.reload_doc();
 		},
 	});
+}
+
+// ---------------------------------------------------------------------------
+// Shared: patch a MultiSelectDialog so filter changes auto-refresh results.
+// Wraps validate_and_set_in_model on setter fields — the only reliable hook
+// for Frappe Link/Date controls that don't dispatch DOM change events.
+// ---------------------------------------------------------------------------
+
+function patch_dialog_filter_refresh(dialog_obj) {
+	const refresh = frappe.utils.debounce(() => {
+		if (dialog_obj.is_child_selection_enabled?.()) {
+			dialog_obj.show_child_results?.();
+		} else {
+			dialog_obj.get_results?.();
+		}
+	}, 300);
+
+	["customer", "transaction_date"].forEach((fieldname) => {
+		const field = dialog_obj.dialog.fields_dict[fieldname];
+		if (!field) return;
+		const orig = field.validate_and_set_in_model.bind(field);
+		field.validate_and_set_in_model = function (value, e, force) {
+			const result = orig(value, e, force);
+			Promise.resolve(result).then(refresh);
+			return result;
+		};
+	});
+
+	const search_field = dialog_obj.dialog.fields_dict["search_term"];
+	if (search_field) {
+		search_field.$input?.on("input.iib_child", refresh);
+	}
 }
 
 function restrict_required_date(frm) {

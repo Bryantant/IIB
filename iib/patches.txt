@@ -17,3 +17,4 @@ iib.patches.v0_0.recompute_jop2_wip_quantity_submitted_only
 iib.patches.v0_0.sync_tolerance_child_doctypes
 iib.patches.v0_0.drop_old_p1_p2_tables
 iib.patches.v0_0.create_iib_feature_control_defaults
+iib.patches.v1_0.rename_corrugator_item_required_date_to_due_date

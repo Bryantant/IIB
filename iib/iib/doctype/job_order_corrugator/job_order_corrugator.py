@@ -142,9 +142,9 @@ class JobOrderCorrugator(Document):
 		seen = set()
 		customers = set()
 		for row in self.items:
-			if row.required_date and getdate(row.required_date) < getdate(self.transaction_date):
+			if row.due_date and getdate(row.due_date) < getdate(self.transaction_date):
 				frappe.throw(
-					_("Row {0}: Required Date cannot be before Transaction Date ({1}).").format(
+					_("Row {0}: Due Date cannot be before Transaction Date ({1}).").format(
 						row.idx, self.transaction_date
 					)
 				)

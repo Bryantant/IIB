@@ -141,6 +141,7 @@ doc_events = {
 	},
 	"Sales Order": {
 		"autoname": "iib.overrides.sales_order.autoname",
+		"validate": "iib.overrides.sales_order.validate",
 	},
 	"Purchase Order": {
 		"autoname": "iib.overrides.purchase_order.autoname",

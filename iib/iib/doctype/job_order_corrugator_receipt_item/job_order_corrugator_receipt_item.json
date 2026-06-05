@@ -11,6 +11,7 @@
   "item_code",
   "description",
   "sales_order",
+  "due_date",
   "basic_rate",
   "qty",
   "uom",
@@ -57,6 +58,14 @@
    "in_list_view": 1,
    "label": "SO No",
    "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date",
    "read_only": 1
   },
   {

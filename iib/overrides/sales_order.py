@@ -2,6 +2,15 @@ import frappe
 from frappe.utils import getdate, nowdate
 
 
+def validate(doc, method=None):
+    if not doc.so_batch:
+        frappe.throw(
+            "Sales Orders must be created through an <b>SO Batch</b>. "
+            "Open or create an SO Batch and submit it to generate Sales Orders automatically.",
+            title="Direct Creation Not Allowed",
+        )
+
+
 def autoname(doc, method=None):
     from iib.iib.utils.naming import get_next_iib_number
 

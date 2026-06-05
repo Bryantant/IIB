@@ -9,9 +9,9 @@
   "posting_date",
   "set_posting_time",
   "posting_time",
+  "received_by",
   "column_break_header",
   "status",
-  "received_by",
   "notes",
   "section_break_accounting",
   "expense_account",
@@ -64,6 +64,7 @@
    "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
+   "hidden": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
@@ -86,6 +87,7 @@
   {
    "fieldname": "section_break_accounting",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "Accounting"
   },
   {
@@ -152,7 +154,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-30 17:42:17.130042",
+ "modified": "2026-06-05 14:07:06.927962",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order Corrugator Receipt",

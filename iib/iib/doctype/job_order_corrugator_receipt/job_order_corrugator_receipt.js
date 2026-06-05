@@ -145,6 +145,24 @@ function open_corrugator_selector(frm) {
 			open_receipt_item_picker(frm, selections, filtered_children);
 		},
 	});
+
+	// Frappe bug: empty parent list skips the filter → shows all child items.
+	picker.add_parent_filters = async function (filters) {
+		const parent_names = await picker.get_filtered_parents_for_child_search();
+		filters.push(["parent", "in", parent_names.length ? parent_names : ["__no_match__"]]);
+	};
+
+	picker.get_child_datatable_columns = function () {
+		return [
+			__("Job Order Corrugator"),
+			__("Item Code"),
+			__("Item Name"),
+			__("Qty"),
+			__("Received Qty"),
+		].map((name) => ({ name, editable: false }));
+	};
+
+	patch_dialog_filter_refresh(picker);
 }
 
 /**
@@ -186,6 +204,7 @@ function open_receipt_item_picker(frm, job_order_corrugators, filtered_children)
 				row.sales_order       = item.sales_order || "";
 				row.uom               = item.uom;
 				row.qty               = item.pending_qty;
+				row.due_date          = item.due_date || "";
 				row.amount            = 0;
 				row.target_warehouse  = item.target_warehouse;
 			});
@@ -196,6 +215,36 @@ function open_receipt_item_picker(frm, job_order_corrugators, filtered_children)
 			});
 		},
 	});
+}
+
+// ---------------------------------------------------------------------------
+// Shared: patch a MultiSelectDialog so filter changes auto-refresh results.
+// ---------------------------------------------------------------------------
+
+function patch_dialog_filter_refresh(dialog_obj) {
+	const refresh = frappe.utils.debounce(() => {
+		if (dialog_obj.is_child_selection_enabled?.()) {
+			dialog_obj.show_child_results?.();
+		} else {
+			dialog_obj.get_results?.();
+		}
+	}, 300);
+
+	["customer", "transaction_date"].forEach((fieldname) => {
+		const field = dialog_obj.dialog.fields_dict[fieldname];
+		if (!field) return;
+		const orig = field.validate_and_set_in_model.bind(field);
+		field.validate_and_set_in_model = function (value, e, force) {
+			const result = orig(value, e, force);
+			Promise.resolve(result).then(refresh);
+			return result;
+		};
+	});
+
+	const search_field = dialog_obj.dialog.fields_dict["search_term"];
+	if (search_field) {
+		search_field.$input?.on("input.iib_child", refresh);
+	}
 }
 
 // Row-level: recompute totals on qty change
