@@ -1,7 +1,6 @@
 {
  "actions": [],
  "autoname": "custom",
- "status_field": "status",
  "creation": "2026-05-20 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -13,7 +12,6 @@
   "column_break_header",
   "status",
   "target_warehouse",
-  "department",
   "per_received",
   "section_break_items",
   "items",
@@ -64,6 +62,7 @@
    "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
+   "hidden": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
@@ -79,13 +78,6 @@
    "label": "Target Warehouse",
    "options": "Warehouse",
    "reqd": 1
-  },
-  {
-   "default": "Production 1",
-   "fieldname": "department",
-   "fieldtype": "Data",
-   "label": "Department",
-   "read_only": 1
   },
   {
    "default": "0",
@@ -152,7 +144,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-30 17:32:03.409839",
+ "modified": "2026-06-05 13:55:59.201640",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order Corrugator",

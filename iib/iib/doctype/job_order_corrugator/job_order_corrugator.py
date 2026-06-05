@@ -22,7 +22,7 @@ class JobOrderCorrugator(Document):
 		self.name = f"IIB{yy}{seq}"
 
 	def validate(self):
-		self.set_defaults()
+		self.target_warehouse = JOP1_TARGET_WAREHOUSE
 		self.fetch_item_metadata()
 		self.validate_items()
 		self.compute_totals()
@@ -46,11 +46,6 @@ class JobOrderCorrugator(Document):
 		self.update_so_item_corrugator_qty()
 
 	# ---- validate helpers ----
-
-	def set_defaults(self):
-		if not self.department:
-			self.department = "Production 1"
-		self.target_warehouse = JOP1_TARGET_WAREHOUSE
 
 	def fetch_item_metadata(self):
 		for row in self.items:
