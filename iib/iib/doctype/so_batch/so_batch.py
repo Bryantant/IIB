@@ -14,10 +14,30 @@ class SOBatch(Document):
         self.name = f"{yy}{seq}"
 
     def validate(self):
+        if getdate(self.transaction_date) < getdate(frappe.utils.today()):
+            frappe.throw("Transaction Date cannot be backdated.")
         if not self.company:
             self.company = frappe.db.get_single_value("Global Defaults", "default_company")
+        self.validate_delivery_dates()
         self.set_resolved_items()
         self.set_validated_rates()
+
+    def validate_delivery_dates(self):
+        for row in self.so_batch_items:
+            if not row.delivery_date:
+                continue
+            if getdate(row.delivery_date) < getdate(self.transaction_date):
+                frappe.throw(
+                    "Row {0}: Delivery Date cannot be before Transaction Date ({1}).".format(
+                        row.idx, self.transaction_date
+                    )
+                )
+            if row.po_date and getdate(row.delivery_date) < getdate(row.po_date):
+                frappe.throw(
+                    "Row {0}: Delivery Date cannot be before PO Date ({1}).".format(
+                        row.idx, row.po_date
+                    )
+                )
 
     def on_submit(self):
         self.create_sales_orders()
