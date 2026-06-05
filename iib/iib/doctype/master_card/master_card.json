@@ -8,9 +8,9 @@
  "field_order": [
   "tab_details",
   "item_code",
-  "col_break_header",
   "customer",
   "description",
+  "col_break_header",
   "disabled",
   "company",
   "rm_cost_as_per",
@@ -127,17 +127,17 @@
   {
    "fieldname": "sec_items",
    "fieldtype": "Section Break",
-   "label": "Finish Goods"
+   "label": "Master Card Component"
   },
   {
    "fieldname": "copy_fg_html",
    "fieldtype": "HTML",
-   "label": "Copy FG Button"
+   "label": "Copy"
   },
   {
    "fieldname": "items",
    "fieldtype": "Table",
-   "label": "Finish Goods",
+   "label": "Component",
    "options": "Master Card Item"
   },
   {
@@ -193,7 +193,7 @@
  ],
  "icon": "fa fa-sitemap",
  "links": [],
- "modified": "2026-05-23 16:15:29.356910",
+ "modified": "2026-06-05 12:28:32.259549",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Master Card",

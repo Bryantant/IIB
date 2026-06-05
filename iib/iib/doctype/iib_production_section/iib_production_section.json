@@ -1,13 +1,12 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:section_code",
+ "autoname": "field:section_name",
  "creation": "2026-05-21 00:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "section_code",
   "section_name",
   "parent_iib_production_section",
   "is_group",
@@ -20,18 +19,12 @@
  ],
  "fields": [
   {
-   "fieldname": "section_code",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Section Code",
-   "reqd": 1,
-   "unique": 1
-  },
-  {
    "fieldname": "section_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Section Name"
+   "label": "Section Name",
+   "reqd": 1,
+   "unique": 1
   },
   {
    "fieldname": "parent_iib_production_section",
@@ -39,6 +32,7 @@
    "ignore_user_permissions": 1,
    "in_list_view": 1,
    "label": "Parent Production Section",
+   "link_filters": "[[\"IIB Production Section\", \"is_group\", \"=\", 1]]",
    "options": "IIB Production Section"
   },
   {
@@ -158,6 +152,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "section_code",
+ "title_field": "section_name",
  "track_changes": 1
 }

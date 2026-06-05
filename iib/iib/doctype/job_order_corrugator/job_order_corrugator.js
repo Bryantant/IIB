@@ -79,7 +79,7 @@ function add_get_items_button(frm) {
 	frm.add_custom_button(
 		__("Sales Order"),
 		() => {
-			erpnext.utils.map_current_doc({
+			const d = erpnext.utils.map_current_doc({
 				method: "iib.iib.doctype.job_order_corrugator.job_order_corrugator.get_items_from_so_for_corrugator",
 				source_doctype: "Sales Order",
 				target: frm,
@@ -96,6 +96,25 @@ function add_get_items_button(frm) {
 				child_fieldname: "items",
 				child_columns: ["item_code", "item_name", "qty", "custom_corrugator_qty"],
 			});
+			if (d) {
+				// Frappe bug: when no parent SOs match the filter, add_parent_filters
+				// skips the filter entirely and returns ALL child items instead of none.
+				// Fix: always push the filter, using a sentinel when parent list is empty.
+				d.add_parent_filters = async function (filters) {
+					const parent_names = await d.get_filtered_parents_for_child_search();
+					filters.push(["parent", "in", parent_names.length ? parent_names : ["__no_match__"]]);
+				};
+
+				d.get_child_datatable_columns = function () {
+					return [
+						__("Sales Order"),
+						__("Item Code"),
+						__("Item Name"),
+						__("Qty"),
+						__("Corrugator Qty"),
+					].map((name) => ({ name, editable: false }));
+				};
+			}
 		},
 		__("Get Items From")
 	);

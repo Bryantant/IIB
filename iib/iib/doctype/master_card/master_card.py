@@ -333,6 +333,40 @@ class MasterCard(Document):
 				frappe.db.set_value("Item", row.item_code, "disabled", disabled_val)
 
 	# ------------------------------------------------------------------
+	# Delete
+	# ------------------------------------------------------------------
+
+	def on_trash(self):
+		self._block_if_referenced()
+		self._delete_linked_items()
+
+	def _block_if_referenced(self):
+		checks = [
+			("Job Order Converting", "master_card"),
+			("Daily Production Schedule Item", "master_card"),
+			("Production Process Item", "master_card"),
+			("FGTS Item", "master_card"),
+		]
+		for doctype, fieldname in checks:
+			if frappe.db.exists(doctype, {fieldname: self.name}):
+				frappe.throw(
+					_("Cannot delete Master Card {0}: it is referenced in {1}.").format(
+						self.name, _(doctype)
+					)
+				)
+
+	def _delete_linked_items(self):
+		if self.item_code and frappe.db.exists("Product Bundle", self.item_code):
+			frappe.delete_doc("Product Bundle", self.item_code, ignore_permissions=True)
+
+		for row in self.items:
+			if row.item_code and frappe.db.exists("Item", row.item_code):
+				frappe.delete_doc("Item", row.item_code, ignore_permissions=True)
+
+		if self.item_code and frappe.db.exists("Item", self.item_code):
+			frappe.delete_doc("Item", self.item_code, ignore_permissions=True)
+
+	# ------------------------------------------------------------------
 	# New Version
 	# ------------------------------------------------------------------
 

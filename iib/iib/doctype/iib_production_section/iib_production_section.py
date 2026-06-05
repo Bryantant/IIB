@@ -36,7 +36,7 @@ def get_section_leaf_query(doctype, txt, searchfield, start, page_len, filters):
 	conditions = [
 		"disabled = 0",
 		"is_group = 0",
-		f"({searchfield} LIKE %(txt)s OR section_name LIKE %(txt)s)",
+		f"{searchfield} LIKE %(txt)s",
 	]
 	values = {
 		"txt": f"%{txt}%",

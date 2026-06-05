@@ -4,6 +4,7 @@
 frappe.ui.form.on("Master Card", {
 	setup(frm) {
 		set_process_queries(frm);
+		set_colour_queries(frm);
 	},
 
 	refresh(frm) {
@@ -113,6 +114,12 @@ frappe.ui.form.on("Master Card", {
 	},
 
 	add_action_buttons(frm) {
+		if (!frm.is_new() && frm.doc.customer) {
+			frm.add_custom_button(__("Customer"), () => {
+				frappe.set_route("Form", "Customer", frm.doc.customer);
+			});
+		}
+
 		// New Version — show on any saved (non-new) doc
 		if (!frm.is_new()) {
 			frm.add_custom_button(__("New Version"), () => {
@@ -168,6 +175,15 @@ frappe.ui.form.on("Master Card Item", {
 		}
 
 		frm.trigger("render_process_tabs");
+	},
+
+	custom_printing(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (!row.custom_printing) {
+			[1, 2, 3, 4, 5].forEach((i) => {
+				frappe.model.set_value(cdt, cdn, `custom_colour_${i}`, null);
+			});
+		}
 	},
 
 	items_remove(frm) {
@@ -245,6 +261,14 @@ function set_process_queries(frm) {
 			disabled: 0,
 		},
 	}));
+}
+
+function set_colour_queries(frm) {
+	[1, 2, 3, 4, 5].forEach((i) => {
+		frm.set_query(`custom_colour_${i}`, "items", () => ({
+			filters: { colour_group: `Colour ${i}` },
+		}));
+	});
 }
 
 function calculate_price_rows(frm) {
