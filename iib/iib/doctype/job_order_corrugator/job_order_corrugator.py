@@ -22,6 +22,8 @@ class JobOrderCorrugator(Document):
 		self.name = f"IIB{yy}{seq}"
 
 	def validate(self):
+		if self.required_date and getdate(self.required_date) < getdate(self.transaction_date):
+			frappe.throw(_("Required Date cannot be before Transaction Date."))
 		self.set_defaults()
 		self.fetch_item_metadata()
 		self.validate_items()

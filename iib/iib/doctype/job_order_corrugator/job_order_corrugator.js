@@ -26,6 +26,10 @@ frappe.ui.form.on("Job Order Corrugator", {
 		add_get_items_button(frm);
 		add_create_receipt_button(frm);
 		add_status_buttons(frm);
+		restrict_required_date(frm);
+	},
+	transaction_date(frm) {
+		restrict_required_date(frm);
 	},
 });
 
@@ -114,6 +118,30 @@ function add_get_items_button(frm) {
 						__("Corrugator Qty"),
 					].map((name) => ({ name, editable: false }));
 				};
+
+				// Re-fetch child results whenever a setter changes while in child mode.
+				// Patch df.onchange (Frappe's internal hook) since Link/Date fields
+				// set values programmatically and don't reliably fire raw DOM change events.
+				setTimeout(() => {
+					const refresh = frappe.utils.debounce(() => {
+						if (d.is_child_selection_enabled?.()) d.show_child_results?.();
+					}, 300);
+
+					["customer", "transaction_date"].forEach((fieldname) => {
+						const field = d.dialog.fields_dict[fieldname];
+						if (!field) return;
+						const orig = field.df.onchange;
+						field.df.onchange = function () {
+							orig?.call(this);
+							refresh();
+						};
+					});
+
+					const search_field = d.dialog.fields_dict["search_term"];
+					if (search_field) {
+						search_field.$input?.on("input.iib_child", refresh);
+					}
+				}, 500);
 			}
 		},
 		__("Get Items From")
@@ -169,5 +197,12 @@ function set_status(frm, status) {
 		callback() {
 			frm.reload_doc();
 		},
+	});
+}
+
+function restrict_required_date(frm) {
+	if (!frm.doc.transaction_date) return;
+	frm.fields_dict["required_date"].datepicker?.update({
+		minDate: new Date(frm.doc.transaction_date),
 	});
 }
