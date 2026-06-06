@@ -6,19 +6,22 @@
  "engine": "InnoDB",
  "field_order": [
   "company",
+  "section_break_job_info",
   "customer",
   "transaction_date",
+  "column_break_job_info_right",
   "required_date",
-  "column_break_header",
-  "status",
-  "target_warehouse",
   "per_received",
   "section_break_items",
   "items",
   "section_break_totals",
   "total_qty",
   "total_received_qty",
+  "column_break_totals_right",
+  "remarks",
   "section_break_result",
+  "status",
+  "target_warehouse",
   "created_receipts",
   "amended_from"
  ],
@@ -31,6 +34,11 @@
    "label": "Company",
    "options": "Company",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_job_info",
+   "fieldtype": "Section Break",
+   "label": "Job Info"
   },
   {
    "fieldname": "customer",
@@ -49,34 +57,13 @@
    "reqd": 1
   },
   {
-   "fieldname": "required_date",
-   "fieldtype": "Date",
-   "label": "Due Date",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_header",
+   "fieldname": "column_break_job_info_right",
    "fieldtype": "Column Break"
   },
   {
-   "default": "Draft",
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "hidden": 1,
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Status",
-   "options": "Draft\nTo Receive\nPartially Received\nCompleted\nClosed\nCancelled",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "default": "Raw Material - IIB",
-   "fieldname": "target_warehouse",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Target Warehouse",
-   "options": "Warehouse",
+   "fieldname": "required_date",
+   "fieldtype": "Date",
+   "label": "Due Date",
    "reqd": 1
   },
   {
@@ -100,10 +87,9 @@
    "reqd": 1
   },
   {
-   "collapsible": 1,
    "fieldname": "section_break_totals",
    "fieldtype": "Section Break",
-   "label": "Totals"
+   "label": "Summary"
   },
   {
    "default": "0",
@@ -120,10 +106,40 @@
    "read_only": 1
   },
   {
+   "fieldname": "column_break_totals_right",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
    "collapsible": 1,
    "fieldname": "section_break_result",
    "fieldtype": "Section Break",
    "label": "Result"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nTo Receive\nPartially Received\nCompleted\nClosed\nCancelled",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Raw Material - IIB",
+   "fieldname": "target_warehouse",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Target Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
   },
   {
    "fieldname": "created_receipts",
@@ -144,7 +160,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-05 14:22:56.608807",
+ "modified": "2026-06-06 13:32:27.823551",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order Corrugator",

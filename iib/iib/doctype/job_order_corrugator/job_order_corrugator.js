@@ -27,6 +27,7 @@ frappe.ui.form.on("Job Order Corrugator", {
 		add_create_receipt_button(frm);
 		add_status_buttons(frm);
 		restrict_required_date(frm);
+		recalc_all_rows(frm);
 	},
 	transaction_date(frm) {
 		restrict_required_date(frm);
@@ -46,6 +47,11 @@ frappe.ui.form.on("Job Order Corrugator", {
 // ---------------------------------------------------------------------------
 
 frappe.ui.form.on("Job Order Corrugator Item", {
+	items_add(frm, cdt, cdn) {
+		if (frm.doc.required_date) {
+			frappe.model.set_value(cdt, cdn, "due_date", frm.doc.required_date);
+		}
+	},
 	due_date(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
 		if (!row.due_date) return;
@@ -76,7 +82,72 @@ frappe.ui.form.on("Job Order Corrugator Item", {
 			},
 		});
 	},
+
+	// Fetch fields fire after the AJAX response for fetch_from resolves — correct
+	// timing to recalculate derived production fields for this row.
+	// Fetch fields — fire after AJAX fetch_from resolves
+	width(frm, cdt, cdn) {
+		recalc_row(frm, cdt, cdn);
+	},
+	length(frm, cdt, cdn) {
+		recalc_row(frm, cdt, cdn);
+	},
+	dc(frm, cdt, cdn) {
+		recalc_row(frm, cdt, cdn);
+	},
+	set_pcs(frm, cdt, cdn) {
+		recalc_row(frm, cdt, cdn);
+	},
+	// User-editable fields that feed calculations
+	qty(frm, cdt, cdn) {
+		recalc_row(frm, cdt, cdn);
+	},
+	running_width(frm, cdt, cdn) {
+		recalc_row(frm, cdt, cdn);
+	},
+	running_length(frm, cdt, cdn) {
+		recalc_row(frm, cdt, cdn);
+	},
+	setting(frm, cdt, cdn) {
+		recalc_row(frm, cdt, cdn);
+	},
 });
+
+// ---------------------------------------------------------------------------
+// Production calculation helpers (display / print only — no business logic)
+// ---------------------------------------------------------------------------
+
+function recalc_row(frm, cdt, cdn) {
+	const row = locals[cdt][cdn];
+	if (!row) return;
+
+	let up_width = null;
+	if (row.running_width && row.width)
+		up_width = Math.floor(row.running_width / row.width);
+
+	let up_length = null;
+	if (row.running_length && row.length)
+		up_length = Math.floor(row.running_length / row.length);
+
+	let upw_upl = null;
+	if (up_width !== null && up_length !== null)
+		upw_upl = up_width * up_length;
+
+	let qty_production = null;
+	if (row.qty && row.dc && upw_upl !== null && upw_upl > 0 && row.set_pcs)
+		qty_production = ((row.qty + (row.setting || 0)) / row.dc) / upw_upl * row.set_pcs;
+
+	frappe.model.set_value(cdt, cdn, {
+		up_width: up_width !== null ? up_width : 0,
+		up_length: up_length !== null ? up_length : 0,
+		upw_upl: upw_upl !== null ? upw_upl : 0,
+		qty_production: qty_production !== null ? qty_production : 0,
+	});
+}
+
+function recalc_all_rows(frm) {
+	(frm.doc.items || []).forEach((row) => recalc_row(frm, row.doctype, row.name));
+}
 
 function set_status_indicator(frm) {
 	if (frm.doc.docstatus !== 1) return;

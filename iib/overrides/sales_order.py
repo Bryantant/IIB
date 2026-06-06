@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import getdate, nowdate
+from frappe.utils import getdate
 
 
 def validate(doc, method=None):

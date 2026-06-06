@@ -6,24 +6,123 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "sec_order",
   "sales_order",
   "sales_order_item",
+  "col_break_order",
   "item_code",
   "item_name",
   "description",
+  "customer_part_no",
+  "sec_board_spec",
+  "quality",
+  "width",
+  "length",
+  "col_break_board_spec",
+  "dc",
+  "set_pcs",
   "uom",
+  "sec_qty",
   "qty",
+  "col_break_qty",
   "received_qty",
   "pending_qty",
-  "customer",
-  "delivery_date",
+  "sec_machine_settings",
+  "running_width",
+  "running_length",
+  "col_break_machine",
+  "setting",
+  "cutting_number",
+  "sec_production",
+  "up_width",
+  "up_length",
+  "col_break_production",
+  "upw_upl",
+  "qty_production",
+  "sec_dates",
   "due_date",
+  "delivery_date",
+  "col_break_dates",
   "rate",
-  "customer_part_no",
-  "remarks"
+  "customer"
  ],
  "fields": [
   {
+   "fieldname": "sec_order",
+   "fieldtype": "Section Break",
+   "label": "Order"
+  },
+  {
+   "fieldname": "col_break_order",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sec_board_spec",
+   "fieldtype": "Section Break",
+   "label": "Board Spec"
+  },
+  {
+   "fieldname": "col_break_board_spec",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sec_qty",
+   "fieldtype": "Section Break",
+   "label": "Qty"
+  },
+  {
+   "fieldname": "col_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sec_machine_settings",
+   "fieldtype": "Section Break",
+   "label": "Machine Settings"
+  },
+  {
+   "fieldname": "running_width",
+   "fieldtype": "Float",
+   "label": "Running Width"
+  },
+  {
+   "fieldname": "running_length",
+   "fieldtype": "Float",
+   "label": "Running Length"
+  },
+  {
+   "fieldname": "col_break_machine",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "setting",
+   "fieldtype": "Float",
+   "label": "Setting"
+  },
+  {
+   "fieldname": "cutting_number",
+   "fieldtype": "Data",
+   "label": "Cutting Number"
+  },
+  {
+   "fieldname": "sec_production",
+   "fieldtype": "Section Break",
+   "label": "Production"
+  },
+  {
+   "fieldname": "col_break_production",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sec_dates",
+   "fieldtype": "Section Break",
+   "label": "Dates"
+  },
+  {
+   "fieldname": "col_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
    "fieldname": "sales_order",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -73,7 +172,7 @@
    "fieldname": "qty",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Qty",
+   "label": "Qty Req",
    "reqd": 1
   },
   {
@@ -102,16 +201,19 @@
    "read_only": 1
   },
   {
+   "columns": 1,
    "fieldname": "delivery_date",
    "fieldtype": "Date",
-   "label": "Delivery Date"
+   "in_list_view": 1,
+   "label": "Delivery Date",
+   "read_only": 1
   },
   {
    "columns": 1,
    "fieldname": "due_date",
    "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Due Date"
+   "label": "JO Due Date"
   },
   {
    "fieldname": "rate",
@@ -127,19 +229,73 @@
    "read_only": 1
   },
   {
-   "columns": 2,
-   "fieldname": "remarks",
-   "fieldtype": "Small Text",
-   "in_list_view": 1,
-   "label": "Remarks"
+   "fetch_from": "item_code.custom_board_quality",
+   "fieldname": "quality",
+   "fieldtype": "Link",
+   "label": "Quality",
+   "options": "Board Quality",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_width",
+   "fieldname": "width",
+   "fieldtype": "Int",
+   "label": "Width",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_length",
+   "fieldname": "length",
+   "fieldtype": "Int",
+   "label": "Length",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_dc",
+   "fieldname": "dc",
+   "fieldtype": "Int",
+   "label": "D/C",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_set_pcs",
+   "fieldname": "set_pcs",
+   "fieldtype": "Float",
+   "label": "Set/Pcs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "up_width",
+   "fieldtype": "Float",
+   "label": "Up Width",
+   "read_only": 1
+  },
+  {
+   "fieldname": "up_length",
+   "fieldtype": "Float",
+   "label": "Up Length",
+   "read_only": 1
+  },
+  {
+   "fieldname": "upw_upl",
+   "fieldtype": "Float",
+   "label": "UpW UpL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty_production",
+   "fieldtype": "Float",
+   "label": "Qty",
+   "read_only": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-06-05 13:54:27.196439",
+ "modified": "2026-06-06 13:28:11.947242",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order Corrugator Item",
+ "naming_rule": "Autoincrement",
  "owner": "Administrator",
  "permissions": [],
  "row_format": "Dynamic",

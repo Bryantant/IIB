@@ -241,6 +241,7 @@ class MasterCard(Document):
 			row.item_name = row.item_description or row.item_code
 
 			spec = {f: row.get(f) for f in ITEM_SPEC_FIELDS}
+			spec["custom_set_pcs"] = row.qty
 
 			if frappe.db.exists("Item", row.item_code):
 				updates = {f: v for f, v in spec.items() if v is not None}
