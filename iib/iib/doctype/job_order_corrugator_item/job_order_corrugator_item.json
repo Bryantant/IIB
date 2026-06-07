@@ -52,6 +52,7 @@
   "sec_dates",
   "due_date",
   "delivery_date",
+  "so_date",
   "col_break_dates",
   "rate",
   "customer"
@@ -272,6 +273,14 @@
    "fieldtype": "Date",
    "in_list_view": 1,
    "label": "Delivery Date",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "so_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "SO Date",
    "read_only": 1
   },
   {

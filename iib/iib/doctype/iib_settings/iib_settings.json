@@ -5,9 +5,6 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "fg_item_group",
-  "sub_assembly_item_group",
-  "column_break_1",
   "component_item_group",
   "default_uom",
   "section_master_card",
@@ -29,24 +26,6 @@
   "converting_tolerance"
  ],
  "fields": [
-  {
-   "default": "Master Card",
-   "fieldname": "fg_item_group",
-   "fieldtype": "Link",
-   "label": "FG Item Group",
-   "options": "Item Group"
-  },
-  {
-   "default": "Sub Assemblies",
-   "fieldname": "sub_assembly_item_group",
-   "fieldtype": "Link",
-   "label": "Sub-Assembly Item Group",
-   "options": "Item Group"
-  },
-  {
-   "fieldname": "column_break_1",
-   "fieldtype": "Column Break"
-  },
   {
    "default": "Component",
    "fieldname": "component_item_group",

@@ -13,16 +13,17 @@
   "on_hand_qty",
   "get_sales_orders",
   "sec_so_filter",
-  "item_name",
-  "description",
-  "master_card",
-  "remark",
   "col_break_header",
   "status",
   "posting_date",
   "due_date",
   "qty",
   "produced_qty",
+  "column_break_qrvh",
+  "item_name",
+  "description",
+  "master_card",
+  "remark",
   "sec_tracking",
   "total_so_qty",
   "delivered_qty",
@@ -210,7 +211,6 @@
    "label": "Job Order Converting Items"
   },
   {
-   "cannot_add_rows": 1,
    "fieldname": "sales_order_items",
    "fieldtype": "Table",
    "label": "Job Order Converting Items",
@@ -222,7 +222,6 @@
    "label": "Operations"
   },
   {
-   "cannot_add_rows": 1,
    "fieldname": "operations",
    "fieldtype": "Table",
    "label": "Operations",
@@ -276,12 +275,16 @@
   {
    "fieldname": "section_break_zinb",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_qrvh",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-05 17:56:25.643237",
+ "modified": "2026-06-07 12:50:58.312055",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order Converting",

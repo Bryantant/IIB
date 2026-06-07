@@ -9,9 +9,11 @@
   "job_order_corrugator",
   "job_order_corrugator_item",
   "item_code",
+  "item_name",
   "description",
   "sales_order",
   "due_date",
+  "delivery_date",
   "basic_rate",
   "qty",
   "uom",
@@ -46,6 +48,14 @@
    "reqd": 1
   },
   {
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
    "fetch_from": "item_code.description",
    "fieldname": "description",
    "fieldtype": "Small Text",
@@ -66,6 +76,14 @@
    "fieldtype": "Date",
    "in_list_view": 1,
    "label": "Due Date",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "delivery_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Delivery Date",
    "read_only": 1
   },
   {

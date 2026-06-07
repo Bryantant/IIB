@@ -403,6 +403,7 @@ def get_corrugator_items_for_receipt_dialog(job_order_corrugators, filtered_chil
 			"qty",
 			"received_qty",
 			"due_date",
+			"delivery_date",
 		],
 		order_by="parent, idx",
 	)

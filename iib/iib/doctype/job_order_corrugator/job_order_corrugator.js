@@ -245,7 +245,10 @@ function open_so_picker_dialog(frm) {
 	// Client-side filter: open_only + item_code_filter
 	function apply_filter(dialog) {
 		const open_only = dialog.get_value("open_only");
-		const item_filter = (dialog.get_value("item_code_filter") || "").trim().toLowerCase();
+		// Read raw $input value so partial text typed before dropdown selection also filters
+		const item_filter = (
+			dialog.fields_dict.item_code_filter?.$input?.val() || ""
+		).trim().toLowerCase();
 
 		displayed_rows = all_rows.filter((r) => {
 			if (open_only && (r.corrugator_qty || 0) >= (r.qty || 0)) return false;
@@ -407,9 +410,10 @@ function open_so_picker_dialog(frm) {
 			},
 			{ fieldtype: "Column Break" },
 			{
-				fieldtype: "Data",
+				fieldtype: "Link",
 				fieldname: "item_code_filter",
 				label: __("Item Code"),
+				options: "Item",
 			},
 			{ fieldtype: "Column Break" },
 			// Results
@@ -445,6 +449,7 @@ function open_so_picker_dialog(frm) {
 				new_row.uom = dialog_row.uom || "Nos";
 				new_row.qty = dialog_row.qty || 0;
 				new_row.delivery_date = dialog_row.delivery_date || null;
+				new_row.so_date = dialog_row.so_date || null;
 				new_row.customer = dialog_row.customer || "";
 				if (frm.doc.required_date) new_row.due_date = frm.doc.required_date;
 				// Setting item_code via frappe.model.set_value triggers the item_code
@@ -461,16 +466,26 @@ function open_so_picker_dialog(frm) {
 		},
 	});
 
-	// Client-side filters: no server call
+	// Client-side filters (no server call)
 	dialog.fields_dict.open_only.$input.on("change", () => apply_filter(dialog));
-	dialog.fields_dict.item_code_filter.$input.on(
-		"input",
-		frappe.utils.debounce(() => apply_filter(dialog), 300)
-	);
+
+	const debounced_apply = frappe.utils.debounce(() => apply_filter(dialog), 300);
+	// item_code_filter is a Link field: hook both typing (input) and dropdown selection
+	// (validate_and_set_in_model). apply_filter reads $input.val() so partial text works.
+	const item_field = dialog.fields_dict.item_code_filter;
+	item_field.$input.on("input", debounced_apply);
+	const orig_item = item_field.validate_and_set_in_model.bind(item_field);
+	item_field.validate_and_set_in_model = function (value, e, force) {
+		const result = orig_item(value, e, force);
+		Promise.resolve(result).then(debounced_apply);
+		return result;
+	};
+	item_field.get_query = () => ({ filters: { item_group: "Component", is_stock_item: 1 } });
 
 	// Server filters: re-fetch on change
 	const debounced_refresh = frappe.utils.debounce(() => refresh_results(dialog), 400);
-	["customer", "transaction_date", "sales_order_filter"].forEach((fieldname) => {
+	// Link fields fire validate_and_set_in_model on selection/clear
+	["customer", "sales_order_filter"].forEach((fieldname) => {
 		const field = dialog.fields_dict[fieldname];
 		if (!field) return;
 		const orig = field.validate_and_set_in_model.bind(field);
@@ -480,6 +495,9 @@ function open_so_picker_dialog(frm) {
 			return result;
 		};
 	});
+	// Date field: Frappe's datepicker calls set_value (not validate_and_set_in_model),
+	// which dispatches a 'change' event on the input — hook that instead.
+	dialog.fields_dict.transaction_date.$input.on("change", debounced_refresh);
 
 	dialog.show();
 	refresh_results(dialog);

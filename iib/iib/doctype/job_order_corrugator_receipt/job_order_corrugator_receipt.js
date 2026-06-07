@@ -129,7 +129,7 @@ function open_corrugator_selector(frm) {
 		},
 		allow_child_item_selection: true,
 		child_fieldname: "items",
-		child_columns: ["item_code", "item_name", "qty", "received_qty"],
+		child_columns: ["due_date", "item_code", "qty", "received_qty"],
 		get_query() {
 			return {
 				filters: {
@@ -154,15 +154,23 @@ function open_corrugator_selector(frm) {
 
 	picker.get_child_datatable_columns = function () {
 		return [
-			__("Job Order Corrugator"),
+			__("JO Corrugator"),
+			__("JO Due Date"),
 			__("Item Code"),
-			__("Item Name"),
 			__("Qty"),
-			__("Received Qty"),
+			__("Rec Qty"),
 		].map((name) => ({ name, editable: false }));
 	};
 
 	patch_dialog_filter_refresh(picker);
+
+	// Default the "Select Job Order Corrugator Item" checkbox to checked
+	setTimeout(() => {
+		if (picker.dialog?.fields_dict?.allow_child_item_selection) {
+			picker.dialog.set_value("allow_child_item_selection", 1);
+			picker.toggle_child_selection?.();
+		}
+	}, 0);
 }
 
 /**
@@ -199,12 +207,13 @@ function open_receipt_item_picker(frm, job_order_corrugators, filtered_children)
 				row.job_order_corrugator      = item.job_order_corrugator;
 				row.job_order_corrugator_item = item.job_order_corrugator_item;
 				row.item_code         = item.item_code;
-				row.item_name         = item.item_name;
+				row.item_name         = item.item_name || "";
 				row.description       = item.description || "";
 				row.sales_order       = item.sales_order || "";
 				row.uom               = item.uom;
 				row.qty               = item.pending_qty;
 				row.due_date          = item.due_date || "";
+				row.delivery_date     = item.delivery_date || "";
 				row.amount            = 0;
 				row.target_warehouse  = item.target_warehouse;
 			});

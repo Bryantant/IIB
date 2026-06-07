@@ -70,11 +70,16 @@ class JobOrderCorrugator(Document):
 			# Check if the SO item is a Product Bundle — packed items have already been
 			# expanded by get_so_items_for_corrugator; preserve the row's item_code in that case.
 			is_bundle = frappe.db.exists("Product Bundle", so_item.item_code)
+			so_header = frappe.db.get_value(
+				"Sales Order", row.sales_order, ["customer", "transaction_date"], as_dict=True
+			)
 			if is_bundle:
 				# Only fill delivery_date / customer; item fields come from the packed item
 				if not row.delivery_date:
 					row.delivery_date = so_item.delivery_date
-				row.customer = frappe.db.get_value("Sales Order", row.sales_order, "customer")
+				row.customer = so_header.customer
+				if not row.so_date:
+					row.so_date = so_header.transaction_date
 			else:
 				item_details = self.get_stock_item_details(so_item.item_code, row.idx)
 				self.validate_sales_order_stock_uom(
@@ -87,7 +92,9 @@ class JobOrderCorrugator(Document):
 				row.rate = so_item.rate
 				if not row.delivery_date:
 					row.delivery_date = so_item.delivery_date
-				row.customer = frappe.db.get_value("Sales Order", row.sales_order, "customer")
+				row.customer = so_header.customer
+				if not row.so_date:
+					row.so_date = so_header.transaction_date
 
 	def get_stock_item_details(self, item_code, row_idx):
 		item_details = frappe.db.get_value(
