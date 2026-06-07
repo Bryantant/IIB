@@ -593,13 +593,11 @@ def get_items_from_so_for_corrugator(source_name, target_doc=None, kwargs=None):
 def get_so_items_for_corrugator_dialog(sales_orders):
 	"""Return available SO items for the custom two-step JO P1 picker dialog.
 
-	Accepts a JSON list of Sales Order names.  For each SO:
-	  - Skips lines already booked on an active (non-Completed/Closed/Cancelled)
-	    submitted JO P1, or lines that are fully received.
-	  - Expands Product Bundle lines to their packed components so the dialog
-	    shows the actual item codes that will land in the JO P1.
-	  - Includes ``corrugator_qty`` (= ``custom_corrugator_qty`` on Sales Order Item) so the
-	    dialog can show how much has already been ordered.
+	Accepts a JSON list of Sales Order names.  For each SO, expands Product Bundle
+	lines to their packed components so the dialog shows the actual item codes that
+	will land in the JO P1.  ``corrugator_qty`` is read from ``Packed Item`` for
+	bundle components (where tracking lives) and from ``Sales Order Item`` for plain
+	items.
 
 	Returns a flat list of dicts, one per item row to display.
 	"""
@@ -615,10 +613,9 @@ def get_so_items_for_corrugator_dialog(sales_orders):
 			continue
 
 		customer = so.customer
+		so_date = str(so.transaction_date) if so.transaction_date else ""
 
 		for so_item in so.items:
-			corrugator_qty = flt(so_item.get("custom_corrugator_qty") or 0)
-
 			packed_items = frappe.get_all(
 				"Product Bundle Item",
 				filters={"parent": so_item.item_code},
@@ -627,7 +624,9 @@ def get_so_items_for_corrugator_dialog(sales_orders):
 			)
 
 			if packed_items:
-				# Bundle → one result row per packed component
+				# Bundle → one result row per packed component.
+				# Corrugator qty is tracked per component on Packed Item, not on the
+				# bundle parent SO Item row.
 				for packed_item in packed_items:
 					item_meta = (
 						frappe.db.get_value(
@@ -638,16 +637,29 @@ def get_so_items_for_corrugator_dialog(sales_orders):
 						)
 						or {}
 					)
+					component_corrugator_qty = flt(
+						frappe.db.get_value(
+							"Packed Item",
+							{
+								"parent": so_name,
+								"parent_detail_docname": so_item.name,
+								"item_code": packed_item["item_code"],
+							},
+							"custom_corrugator_qty",
+						)
+						or 0
+					)
 					result.append(
 						{
 							"sales_order": so_name,
+							"so_date": so_date,
 							"sales_order_item": so_item.name,
 							"item_code": packed_item["item_code"],
 							"item_name": item_meta.get("item_name") or packed_item["item_code"],
 							"description": packed_item.get("description") or "",
 							"uom": item_meta.get("stock_uom") or "Nos",
 							"qty": flt(so_item.qty) * flt(packed_item["qty_per_bundle"]),
-							"corrugator_qty": corrugator_qty,
+							"corrugator_qty": component_corrugator_qty,
 							"delivery_date": str(so_item.delivery_date) if so_item.delivery_date else "",
 							"customer": customer,
 						}
@@ -656,13 +668,14 @@ def get_so_items_for_corrugator_dialog(sales_orders):
 				result.append(
 					{
 						"sales_order": so_name,
+						"so_date": so_date,
 						"sales_order_item": so_item.name,
 						"item_code": so_item.item_code,
 						"item_name": so_item.item_name or so_item.item_code,
 						"description": so_item.description or "",
 						"uom": so_item.uom,
 						"qty": flt(so_item.qty),
-						"corrugator_qty": corrugator_qty,
+						"corrugator_qty": flt(so_item.get("custom_corrugator_qty") or 0),
 						"delivery_date": str(so_item.delivery_date) if so_item.delivery_date else "",
 						"customer": customer,
 					}

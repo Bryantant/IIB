@@ -230,48 +230,259 @@ function add_get_items_button(frm) {
 	if (frm.doc.docstatus !== 0) return;
 	frm.add_custom_button(
 		__("Sales Order"),
-		() => {
-			const d = erpnext.utils.map_current_doc({
-				method: "iib.iib.doctype.job_order_corrugator.job_order_corrugator.get_items_from_so_for_corrugator",
-				source_doctype: "Sales Order",
-				target: frm,
-				date_field: "transaction_date",
-				setters: {
-					customer: null,
-					transaction_date: null,
-				},
-				get_query_filters: {
-					docstatus: 1,
-					status: ["not in", ["Closed", "Cancelled", "Completed"]],
-				},
-				allow_child_item_selection: true,
-				child_fieldname: "items",
-				child_columns: ["item_code", "item_name", "qty", "custom_corrugator_qty"],
-			});
-			if (d) {
-				// Frappe bug: when no parent SOs match the filter, add_parent_filters
-				// skips the filter entirely and returns ALL child items instead of none.
-				// Fix: always push the filter, using a sentinel when parent list is empty.
-				d.add_parent_filters = async function (filters) {
-					const parent_names = await d.get_filtered_parents_for_child_search();
-					filters.push(["parent", "in", parent_names.length ? parent_names : ["__no_match__"]]);
-				};
-
-				d.get_child_datatable_columns = function () {
-					return [
-						__("Sales Order"),
-						__("Item Code"),
-						__("Item Name"),
-						__("Qty"),
-						__("Corrugator Qty"),
-					].map((name) => ({ name, editable: false }));
-				};
-
-				patch_dialog_filter_refresh(d);
-			}
-		},
+		() => open_so_picker_dialog(frm),
 		__("Get Items From")
 	);
+}
+
+function open_so_picker_dialog(frm) {
+	// all_rows: full server result; displayed_rows: after client-side filters.
+	// displayed_rows items are references into all_rows so _checked persists
+	// across filter toggles.
+	let all_rows = [];
+	let displayed_rows = [];
+
+	// Client-side filter: open_only + item_code_filter
+	function apply_filter(dialog) {
+		const open_only = dialog.get_value("open_only");
+		const item_filter = (dialog.get_value("item_code_filter") || "").trim().toLowerCase();
+
+		displayed_rows = all_rows.filter((r) => {
+			if (open_only && (r.corrugator_qty || 0) >= (r.qty || 0)) return false;
+			if (item_filter && !r.item_code.toLowerCase().includes(item_filter)) return false;
+			return true;
+		});
+		render_results(dialog, displayed_rows);
+	}
+
+	// Server fetch: customer, transaction_date, sales_order_filter
+	function refresh_results(dialog) {
+		const customer = dialog.get_value("customer");
+		const date = dialog.get_value("transaction_date");
+		const so_name = dialog.get_value("sales_order_filter");
+
+		const so_filters = {
+			docstatus: 1,
+			status: ["not in", ["Closed", "Cancelled", "Completed"]],
+		};
+		if (customer) so_filters.customer = customer;
+		if (date) so_filters.transaction_date = [">=", date];
+		if (so_name) so_filters.name = so_name;
+
+		frappe.call({
+			method: "frappe.client.get_list",
+			args: {
+				doctype: "Sales Order",
+				filters: so_filters,
+				fields: ["name"],
+				limit_page_length: 500,
+			},
+			callback(r) {
+				const so_names = (r.message || []).map((row) => row.name);
+				if (!so_names.length) {
+					all_rows = [];
+					displayed_rows = [];
+					render_results(dialog, []);
+					return;
+				}
+				frappe.call({
+					method: "iib.iib.doctype.job_order_corrugator.job_order_corrugator.get_so_items_for_corrugator_dialog",
+					args: { sales_orders: so_names },
+					callback(r2) {
+						all_rows = (r2.message || []).map((row) => ({ ...row, _checked: false }));
+						apply_filter(dialog);
+					},
+				});
+			},
+		});
+	}
+
+	function render_results(dialog, rows) {
+		const $wrapper = dialog.fields_dict.results_html.$wrapper;
+		if (!rows.length) {
+			$wrapper.html(
+				`<p class="text-muted text-center" style="padding: 16px 0;">${__("No items found.")}</p>`
+			);
+			return;
+		}
+
+		let html = `
+			<div style="max-height: 360px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+				<table class="table table-bordered" style="margin: 0; font-size: 12px;">
+					<thead style="position: sticky; top: 0; background: var(--fg-color); z-index: 1;">
+						<tr>
+							<th style="width: 32px; text-align: center; padding: 6px;">
+								<input type="checkbox" id="jop1_select_all">
+							</th>
+							<th style="padding: 6px;">${__("Sales Order")}</th>
+							<th style="padding: 6px;">${__("SO Date")}</th>
+							<th style="padding: 6px;">${__("Delivery Date")}</th>
+							<th style="padding: 6px;">${__("Item Code")}</th>
+							<th style="padding: 6px;">${__("Item Name")}</th>
+							<th style="padding: 6px; text-align: right;">${__("Qty")}</th>
+							<th style="width: 72px; padding: 6px; text-align: right;">${__("Cor Qty")}</th>
+						</tr>
+					</thead>
+					<tbody>`;
+
+		rows.forEach((row, idx) => {
+			const corr = row.corrugator_qty || 0;
+			const so_date = row.so_date ? frappe.datetime.str_to_user(row.so_date) : "";
+			const delivery = row.delivery_date
+				? frappe.datetime.str_to_user(row.delivery_date)
+				: "";
+			html += `
+				<tr style="cursor: pointer;" data-idx="${idx}">
+					<td style="text-align: center; padding: 6px;">
+						<input type="checkbox" class="jop1_row_check" data-idx="${idx}" ${row._checked ? "checked" : ""}>
+					</td>
+					<td style="padding: 6px;">${frappe.utils.escape_html(row.sales_order)}</td>
+					<td style="padding: 6px;">${frappe.utils.escape_html(so_date)}</td>
+					<td style="padding: 6px;">${frappe.utils.escape_html(delivery)}</td>
+					<td style="padding: 6px;">${frappe.utils.escape_html(row.item_code)}</td>
+					<td style="padding: 6px;">${frappe.utils.escape_html(row.item_name || "")}</td>
+					<td style="padding: 6px; text-align: right;">${frappe.format(row.qty, { fieldtype: "Float" })}</td>
+					<td style="width: 72px; padding: 6px; text-align: right; color: ${corr > 0 ? "var(--text-muted)" : "inherit"};">
+						${frappe.format(corr, { fieldtype: "Float" })}
+					</td>
+				</tr>`;
+		});
+
+		html += `</tbody></table></div>`;
+		$wrapper.html(html);
+
+		$wrapper.find("tr[data-idx]").on("click", function (e) {
+			if ($(e.target).is("input")) return;
+			const idx = parseInt($(this).data("idx"), 10);
+			const $cb = $(this).find(".jop1_row_check");
+			const new_state = !$cb.prop("checked");
+			$cb.prop("checked", new_state);
+			displayed_rows[idx]._checked = new_state;
+		});
+
+		$wrapper.find("#jop1_select_all").on("change", function () {
+			const checked = this.checked;
+			$wrapper.find(".jop1_row_check").prop("checked", checked);
+			displayed_rows.forEach((r) => (r._checked = checked));
+		});
+
+		$wrapper.find(".jop1_row_check").on("change", function (e) {
+			e.stopPropagation();
+			const idx = parseInt($(this).data("idx"), 10);
+			displayed_rows[idx]._checked = this.checked;
+		});
+	}
+
+	const dialog = new frappe.ui.Dialog({
+		title: __("Select Sales Order"),
+		size: "large",
+		fields: [
+			// Row 1 (3 columns): Customer | Sales Order | Open qty only
+			{
+				fieldtype: "Link",
+				fieldname: "customer",
+				label: __("Customer"),
+				options: "Customer",
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldtype: "Link",
+				fieldname: "sales_order_filter",
+				label: __("Sales Order"),
+				options: "Sales Order",
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldtype: "Check",
+				fieldname: "open_only",
+				label: __("Open qty only"),
+				default: 1,
+			},
+			// Row 2 (3 columns): Date | Item Code | (empty)
+			{ fieldtype: "Section Break" },
+			{
+				fieldtype: "Date",
+				fieldname: "transaction_date",
+				label: __("Date"),
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldtype: "Data",
+				fieldname: "item_code_filter",
+				label: __("Item Code"),
+			},
+			{ fieldtype: "Column Break" },
+			// Results
+			{ fieldtype: "Section Break" },
+			{
+				fieldtype: "HTML",
+				fieldname: "results_html",
+				options: `<p class="text-muted text-center" style="padding: 16px 0;">${__("Loading...")}</p>`,
+			},
+		],
+		primary_action_label: __("Get Items"),
+		primary_action() {
+			const checked = displayed_rows.filter((r) => r._checked);
+			if (!checked.length) {
+				frappe.msgprint(__("Please select at least one item."));
+				return;
+			}
+			// Strip any blank placeholder rows Frappe may have added to the empty table
+			frm.doc.items = (frm.doc.items || []).filter(
+				(row) => row.item_code || row.sales_order
+			);
+			checked.forEach((dialog_row) => {
+				const new_row = frappe.model.add_child(
+					frm.doc,
+					"Job Order Corrugator Item",
+					"items"
+				);
+				// Direct assignment avoids triggering the sales_order change event
+				// (which would clear item_code and sales_order_item).
+				new_row.sales_order = dialog_row.sales_order;
+				new_row.sales_order_item = dialog_row.sales_order_item;
+				new_row.item_name = dialog_row.item_name || "";
+				new_row.uom = dialog_row.uom || "Nos";
+				new_row.qty = dialog_row.qty || 0;
+				new_row.delivery_date = dialog_row.delivery_date || null;
+				new_row.customer = dialog_row.customer || "";
+				if (frm.doc.required_date) new_row.due_date = frm.doc.required_date;
+				// Setting item_code via frappe.model.set_value triggers the item_code
+				// event, which calls fetch_item_spec() to populate board spec fields.
+				frappe.model.set_value(
+					new_row.doctype,
+					new_row.name,
+					"item_code",
+					dialog_row.item_code
+				);
+			});
+			frm.refresh_field("items");
+			dialog.hide();
+		},
+	});
+
+	// Client-side filters: no server call
+	dialog.fields_dict.open_only.$input.on("change", () => apply_filter(dialog));
+	dialog.fields_dict.item_code_filter.$input.on(
+		"input",
+		frappe.utils.debounce(() => apply_filter(dialog), 300)
+	);
+
+	// Server filters: re-fetch on change
+	const debounced_refresh = frappe.utils.debounce(() => refresh_results(dialog), 400);
+	["customer", "transaction_date", "sales_order_filter"].forEach((fieldname) => {
+		const field = dialog.fields_dict[fieldname];
+		if (!field) return;
+		const orig = field.validate_and_set_in_model.bind(field);
+		field.validate_and_set_in_model = function (value, e, force) {
+			const result = orig(value, e, force);
+			Promise.resolve(result).then(debounced_refresh);
+			return result;
+		};
+	});
+
+	dialog.show();
+	refresh_results(dialog);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,37 +537,6 @@ function set_status(frm, status) {
 	});
 }
 
-// ---------------------------------------------------------------------------
-// Shared: patch a MultiSelectDialog so filter changes auto-refresh results.
-// Wraps validate_and_set_in_model on setter fields — the only reliable hook
-// for Frappe Link/Date controls that don't dispatch DOM change events.
-// ---------------------------------------------------------------------------
-
-function patch_dialog_filter_refresh(dialog_obj) {
-	const refresh = frappe.utils.debounce(() => {
-		if (dialog_obj.is_child_selection_enabled?.()) {
-			dialog_obj.show_child_results?.();
-		} else {
-			dialog_obj.get_results?.();
-		}
-	}, 300);
-
-	["customer", "transaction_date"].forEach((fieldname) => {
-		const field = dialog_obj.dialog.fields_dict[fieldname];
-		if (!field) return;
-		const orig = field.validate_and_set_in_model.bind(field);
-		field.validate_and_set_in_model = function (value, e, force) {
-			const result = orig(value, e, force);
-			Promise.resolve(result).then(refresh);
-			return result;
-		};
-	});
-
-	const search_field = dialog_obj.dialog.fields_dict["search_term"];
-	if (search_field) {
-		search_field.$input?.on("input.iib_child", refresh);
-	}
-}
 
 function restrict_required_date(frm) {
 	if (!frm.doc.transaction_date) return;
