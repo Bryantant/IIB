@@ -126,7 +126,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nNot Started\nIn Process\nCompleted\nStopped\nClosed\nCancelled",
+   "options": "Draft\nIn Process\nCompleted\nStopped\nClosed\nCancelled",
    "read_only": 1,
    "reqd": 1
   },
@@ -157,7 +157,7 @@
    "fieldname": "produced_qty",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Produced Qty",
+   "label": "Converted Qty",
    "read_only": 1
   },
   {
@@ -254,11 +254,13 @@
    "collapsible": 1,
    "fieldname": "sec_result",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "Result"
   },
   {
    "fieldname": "transfer_rm_doc",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "RM Transfer",
    "options": "Job Order Converting RM to WIP",
    "read_only": 1
@@ -284,7 +286,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-07 12:50:58.312055",
+ "modified": "2026-06-07 13:36:12.640397",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order Converting",

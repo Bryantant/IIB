@@ -84,10 +84,11 @@ frappe.ui.form.on("FGTS", {
 		// Add row to child table
 		const row = frappe.model.add_child(frm.doc, "FGTS Item", "items");
 		frappe.model.set_value(row.doctype, row.name, {
-			item_code:   selected.item_code,
-			item_name:   selected.item_name || "",
-			master_card: selected.master_card || "",
-			component:   selected.component || "",
+			item_code:        selected.item_code,
+			item_name:        selected.item_name || "",
+			sales_order_item: selected.sales_order_item || "",
+			master_card:      selected.master_card || "",
+			component:        selected.component || "",
 		});
 		frm.refresh_field("items");
 
@@ -234,31 +235,38 @@ function set_status_indicator(frm) {
 
 /**
  * Populate warehouse quantities (rm_qty, wip_qty, fg_qty, stores_qty) for each item row.
- * Fetches current stock balance from warehouses and displays in the items table.
+ * Fetches current stock balances in a single batched call. Live stock is only
+ * meaningful while drafting, so on submitted docs the saved snapshot is kept.
+ * Values are assigned directly (not via set_value) so the form isn't marked dirty.
  */
 function _populate_warehouse_quantities(frm) {
-	if (!frm.doc.items || !frm.doc.items.length) return;
+	if (frm.doc.docstatus !== 0) return;
 
-	frm.doc.items.forEach((row) => {
-		if (!row.item_code) return;
+	const rows = (frm.doc.items || []).filter((r) => r.item_code);
+	if (!rows.length) return;
 
-		// Call server to get stock balances for all warehouses
-		frappe.call({
-			method: "iib.iib.doctype.fgts.fgts.get_item_warehouse_quantities",
-			args: {
-				item_code: row.item_code,
-				posting_date: frm.doc.posting_date || frappe.datetime.get_today(),
-			},
-			callback(r) {
-				if (!r.message) return;
-				const { rm_qty, wip_qty, fg_qty, stores_qty } = r.message;
-				frappe.model.set_value(row.doctype, row.name, {
-					rm_qty: rm_qty || 0,
-					wip_qty: wip_qty || 0,
-					fg_qty: fg_qty || 0,
-					stores_qty: stores_qty || 0,
+	const item_codes = [...new Set(rows.map((r) => r.item_code))];
+	frappe.call({
+		method: "iib.iib.doctype.fgts.fgts.get_items_warehouse_quantities",
+		args: {
+			item_codes: JSON.stringify(item_codes),
+			posting_date: frm.doc.posting_date || frappe.datetime.get_today(),
+		},
+		callback(r) {
+			if (!r.message) return;
+			let changed = false;
+			rows.forEach((row) => {
+				const q = r.message[row.item_code];
+				if (!q) return;
+				["rm_qty", "wip_qty", "fg_qty", "stores_qty"].forEach((f) => {
+					const val = flt(q[f] || 0);
+					if (flt(row[f]) !== val) {
+						row[f] = val;
+						changed = true;
+					}
 				});
-			},
-		});
+			});
+			if (changed) frm.refresh_field("items");
+		},
 	});
 }

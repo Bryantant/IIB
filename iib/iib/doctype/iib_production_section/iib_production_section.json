@@ -36,7 +36,7 @@
    "options": "IIB Production Section"
   },
   {
-   "default": "1",
+   "default": "0",
    "fieldname": "is_group",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -91,7 +91,7 @@
  "index_web_pages_for_search": 1,
  "is_tree": 1,
  "links": [],
- "modified": "2026-06-06 16:02:47.069137",
+ "modified": "2026-06-07 15:48:25.697645",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "IIB Production Section",

@@ -1,9 +1,14 @@
 frappe.ui.form.on("Job Order Converting", {
 	setup(frm) {
-		// Restrict MC Component to Item Group = "Component"
-		frm.set_query("production_item", () => ({
-			filters: { item_group: "Component" },
-		}));
+		frm.set_query("production_item", () => {
+			if (frm.doc.customer) {
+				return {
+					query: "iib.iib.doctype.job_order_converting.job_order_converting.get_component_items_for_customer",
+					filters: { customer: frm.doc.customer },
+				};
+			}
+			return { filters: { item_group: "Component" } };
+		});
 		frm.set_query("section", "operations", () => ({
 			filters: {
 				is_group: 1,
@@ -36,11 +41,9 @@ frappe.ui.form.on("Job Order Converting", {
 			remember_production_item(frm);
 		}
 		set_status_indicator(frm);
-		["sales_order_items", "operations"].forEach((f) => {
-			frm.fields_dict[f]?.grid?.wrapper?.find(".grid-add-row").hide();
-		});
-		add_start_button(frm);
+		frm.fields_dict["sales_order_items"]?.grid?.wrapper?.find(".grid-add-row").hide();
 		add_view_button(frm);
+		add_refresh_operations_button(frm);
 		add_stop_button(frm);
 		add_close_button(frm);
 		add_return_components_button(frm);
@@ -85,6 +88,14 @@ frappe.ui.form.on("Job Order Converting", {
 		});
 	},
 
+	customer(frm) {
+		if (frm.doc.docstatus !== 0) return;
+		// Clear production_item so the user re-picks from the now-filtered list
+		if (frm.doc.production_item) {
+			frm.set_value("production_item", "");
+		}
+	},
+
 	production_item(frm) {
 		// On a real user change, keep only SO rows that belong to the chosen MC Component.
 		// The Sales Order Create path preloads matching rows before the form opens.
@@ -117,7 +128,6 @@ frappe.ui.form.on("Job Order Converting Operation", {
 function set_status_indicator(frm) {
 	const colors = {
 		Draft: "red",
-		"Not Started": "orange",
 		"In Process": "yellow",
 		Completed: "green",
 		Stopped: "grey",
@@ -218,54 +228,34 @@ async function populate_operations_from_item(frm, production_item) {
 	frm.refresh_field("operations");
 }
 
-// ---- Start button (auto-create + submit RM to WIP in background) ----
+// ---- Refresh Operations Qty button ----
 
-function add_start_button(frm) {
+function add_refresh_operations_button(frm) {
 	if (frm.doc.docstatus !== 1) return;
-	if (frm.doc.status !== "Not Started") return;
-
-	frm.add_custom_button(__("Start"), () => {
-		frappe.show_progress(
-			__("Starting…"),
-			30,
-			100,
-			__("Transferring materials to WIP…")
-		);
+	if (!(frm.doc.operations && frm.doc.operations.length)) return;
+	frm.add_custom_button(__("Refresh Qty"), () => {
 		frappe.call({
-			method: "iib.iib.doctype.job_order_converting.job_order_converting.start_job_order",
+			method: "iib.iib.doctype.job_order_converting.job_order_converting.refresh_operations_qty",
 			args: { name: frm.doc.name },
-			callback(r) {
-				frappe.show_progress(__("Starting…"), 100, 100, __("Done"));
-				setTimeout(() => {
-					frappe.hide_progress();
-					if (r.message) {
-						frappe.show_alert(
-							{
-								message: __("Materials transferred to WIP — {0}", [r.message]),
-								indicator: "green",
-							},
-							6
-						);
-						frm.reload_doc();
-					}
-				}, 500);
-			},
-			error() {
-				frappe.show_progress(__("Starting…"), 100, 100, __("Failed"));
-				setTimeout(() => frappe.hide_progress(), 800);
+			freeze: true,
+			freeze_message: __("Refreshing operation quantities…"),
+			callback() {
+				frm.reload_doc();
+				frappe.show_alert({ message: __("Operation quantities refreshed"), indicator: "green" }, 4);
 			},
 		});
-	}, null, { "css_class": "btn-primary" });
+	});
 }
 
 // ---- View button (dropdown for Stock Ledger) ----
 
 function add_view_button(frm) {
 	if (frm.doc.docstatus !== 1) return;
+	if (!frm.doc.transfer_rm_doc) return;
 	frm.add_custom_button(__("Stock Ledger"), () => {
 		frappe.set_route("query-report", "Stock Ledger", {
 			voucher_type: "Job Order Converting RM to WIP",
-			voucher_no: frm.doc.name,
+			voucher_no: frm.doc.transfer_rm_doc,
 		});
 	}, __("View"));
 }

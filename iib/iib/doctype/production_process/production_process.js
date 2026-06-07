@@ -2,7 +2,7 @@ frappe.ui.form.on("Production Process", {
 	setup(frm) {
 		frm.set_query("section", () => ({ filters: { is_group: 0 } }));
 		frm.set_query("daily_production_schedule", () => ({
-			filters: frm.doc.section ? { section: frm.doc.section, docstatus: 1 } : { docstatus: 1 },
+			filters: frm.doc.section ? { section: frm.doc.section } : {},
 		}));
 		frm.set_query("job_order_converting", "items", () => ({
 			query: "iib.iib.doctype.production_process.production_process.get_job_orders_for_section",
@@ -47,14 +47,89 @@ function render_fetch_dps_btn(frm) {
 	// Only show on unsaved drafts
 	if (frm.doc.docstatus !== 0) return;
 
-	$(`<div class="pp-fetch-wrapper mb-2">
-		<button class="btn btn-sm btn-default btn-pp-fetch">
+	const $wrap = $(`<div class="pp-fetch-wrapper mb-2">
+		<button class="btn btn-sm btn-default btn-pp-fetch mr-2">
 			${__("Fetch from DPS")}
 		</button>
-	</div>`)
-		.insertBefore($table)
-		.find(".btn-pp-fetch")
-		.on("click", () => run_fetch_from_dps(frm));
+		<button class="btn btn-sm btn-default btn-pp-add-item">
+			${__("Add Job by Item")}
+		</button>
+	</div>`).insertBefore($table);
+
+	$wrap.find(".btn-pp-fetch").on("click", () => run_fetch_from_dps(frm));
+	$wrap.find(".btn-pp-add-item").on("click", () => add_job_by_item(frm));
+}
+
+// ---- Add Job by Item: filter by Item and/or pick a Job Order directly ----
+
+const DPS_MODULE = "iib.iib.doctype.daily_production_schedule.daily_production_schedule";
+const PP_MODULE = "iib.iib.doctype.production_process.production_process";
+
+function add_job_by_item(frm) {
+	if (!frm.doc.section) {
+		frappe.show_alert({ message: __("Set Section first"), indicator: "orange" });
+		return;
+	}
+
+	const d = new frappe.ui.Dialog({
+		title: __("Add Job by Item"),
+		fields: [
+			{
+				fieldname: "item_code",
+				fieldtype: "Link",
+				options: "Item",
+				label: __("Filter by Item"),
+				get_query: () => ({
+					query: `${DPS_MODULE}.get_jo_items_for_section`,
+					filters: { section: frm.doc.section || "" },
+				}),
+				onchange: () => d.set_value("job_order_converting", ""),
+			},
+			{
+				fieldname: "job_order_converting",
+				fieldtype: "Link",
+				options: "Job Order Converting",
+				label: __("Job Order"),
+				reqd: 1,
+				get_query: () => ({
+					query: `${PP_MODULE}.get_job_orders_for_section`,
+					filters: {
+						section: frm.doc.section || "",
+						item_code: d.get_value("item_code") || "",
+					},
+				}),
+			},
+		],
+		primary_action_label: __("Add"),
+		primary_action(values) {
+			const exists = (frm.doc.items || []).some(
+				(r) => r.job_order_converting === values.job_order_converting
+			);
+			if (exists) {
+				frappe.show_alert({
+					message: __("Already on this Production Process"),
+					indicator: "orange",
+				});
+				return;
+			}
+			frappe.call({
+				method: `${PP_MODULE}.get_jo_details`,
+				args: { job_order_converting: values.job_order_converting, section: frm.doc.section },
+				callback(r) {
+					if (!r.message) return;
+					const vals = r.message;
+					if (!vals.p_qty && vals.so_qty) vals.p_qty = vals.so_qty;
+					Object.assign(frm.add_child("items"), vals, {
+						job_order_converting: values.job_order_converting,
+					});
+					frm.refresh_field("items");
+					frappe.show_alert({ message: __("Job added"), indicator: "green" });
+				},
+			});
+			d.hide();
+		},
+	});
+	d.show();
 }
 
 function run_fetch_from_dps(frm) {

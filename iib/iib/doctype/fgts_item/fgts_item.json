@@ -8,6 +8,7 @@
   "item_name",
   "master_card",
   "component",
+  "sales_order_item",
   "col_break_1",
   "rm_qty",
   "wip_qty",
@@ -44,6 +45,13 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Component",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Link",
+   "label": "SO Item",
+   "options": "Sales Order Item",
    "read_only": 1
   },
   {

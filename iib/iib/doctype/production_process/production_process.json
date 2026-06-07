@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "custom",
- "creation": "2026-05-25 00:00:00.000000",
+ "creation": "2026-05-25 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -15,8 +15,6 @@
   "daily_production_schedule",
   "sn",
   "col_break_details",
-  "work_hour",
-  "shift",
   "sec_items",
   "items",
   "sec_rejects",
@@ -24,7 +22,7 @@
  ],
  "fields": [
   {
-   "default": "PT Interpak Industries Batam",
+   "default": "PT. Interpak Industries Batam",
    "fieldname": "company",
    "fieldtype": "Link",
    "hidden": 1,
@@ -48,12 +46,12 @@
    "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
+   "hidden": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Draft\nSubmitted\nCancelled",
-   "read_only": 1,
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "amended_from",
@@ -87,25 +85,14 @@
   {
    "fieldname": "sn",
    "fieldtype": "Int",
-   "label": "SN"
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "SN",
+   "reqd": 1
   },
   {
    "fieldname": "col_break_details",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "work_hour",
-   "fieldtype": "Float",
-   "label": "Work Hour"
-  },
-  {
-   "fieldname": "shift",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Shift",
-   "options": "Morning\nAfternoon\nNight",
-   "reqd": 1
   },
   {
    "fieldname": "sec_items",
@@ -133,7 +120,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-25 00:00:00.000000",
+ "modified": "2026-06-07 23:46:00.262716",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Production Process",
@@ -184,6 +171,8 @@
    "write": 1
   },
   {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -193,10 +182,8 @@
    "report": 1,
    "role": "IIB Manufacturing Manager",
    "share": 1,
-   "write": 1,
    "submit": 1,
-   "cancel": 1,
-   "amend": 1
+   "write": 1
   }
  ],
  "row_format": "Dynamic",

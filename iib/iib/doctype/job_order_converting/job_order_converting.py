@@ -297,15 +297,16 @@ class JobOrderConverting(Document):
 
 	def before_submit(self):
 		# NOTE: operations are optional — no validate_operations_exist() call
-		# NOTE: production_section is intentionally NOT required here — it is filled
-		#       later by the Production Process doctype when work is assigned.
 		self.validate_so_items_exist()
-		self.validate_operation_production_sections(require_section=False)
+		self.validate_operation_production_sections(require_section=True)
 		self.validate_converting_tolerance()
 
 	def on_submit(self):
-		self.db_set("status", "Not Started")
 		self.sync_current_so_item_wip_quantities()
+		self.create_rm_to_wip_doc()
+		rm_doc = frappe.get_doc("Job Order Converting RM to WIP", self.transfer_rm_doc)
+		rm_doc.submit()
+		self.db_set("status", "In Process")
 
 	def before_cancel(self):
 		self.guard_against_submitted_movement_docs()
@@ -757,7 +758,7 @@ class JobOrderConverting(Document):
 		elif any(s in ("In Progress", "Completed") for s in statuses):
 			new = "In Process"
 		else:
-			new = "Not Started"
+			new = "In Process"
 		if new != self.status:
 			self.db_set("status", new)
 
@@ -777,7 +778,7 @@ class JobOrderConverting(Document):
 			"Job Order Converting RM to WIP", {"job_order_converting": self.name, "docstatus": 1}
 		):
 			return "In Process"
-		return "Not Started"
+		return "In Process"
 
 	def update_status(self):
 		"""Recompute and persist status. Safe to call from sub-documents."""
@@ -790,16 +791,18 @@ class JobOrderConverting(Document):
 
 	def update_produced_qty(self):
 		"""Recompute produced_qty from submitted FGTS docs (primary) + legacy WIP to FG docs."""
+		# One FGTS = one transfer of `total_qty` finished goods for this JO, so sum
+		# the header qty once per FGTS. Do NOT join FGTS Item filtered by
+		# production_item: bundle FGTS track component rows whose item_code is not
+		# the production_item, which would otherwise contribute zero.
 		fgts_total = frappe.db.sql(
 			"""
 			SELECT IFNULL(SUM(f.total_qty), 0)
-			FROM `tabFGTS Item` fi
-			JOIN `tabFGTS` f ON f.name = fi.parent
+			FROM `tabFGTS` f
 			WHERE f.job_order_converting = %s
 			  AND f.docstatus = 1
-			  AND fi.item_code = %s
 			""",
-			(self.name, self.production_item),
+			(self.name,),
 		)[0][0]
 		legacy_total = frappe.db.sql(
 			"""
@@ -910,6 +913,22 @@ def make_return_components(source_name):
 
 
 @frappe.whitelist()
+def refresh_operations_qty(name):
+	"""Re-aggregate completed_qty for each operation from all non-cancelled Production Process Items."""
+	from iib.iib.utils.operation_qty import write_back_operation_qty
+
+	jo = frappe.get_doc("Job Order Converting", name)
+	frappe.has_permission("Job Order Converting", "write", doc=jo, throw=True)
+
+	for op in jo.operations or []:
+		write_back_operation_qty(op.name, jo.qty)
+
+	jo.reload()
+	jo._refresh_header_status()
+	return True
+
+
+@frappe.whitelist()
 def stop_job_order(name, status):
 	"""Stop / Re-open / Close a submitted Job Order Converting."""
 	if status not in ("Stopped", "In Process", "Completed", "Closed"):
@@ -982,6 +1001,62 @@ def get_so_query_for_production_item(doctype, txt, searchfield, start, page_len,
 			"start": start,
 		},
 		as_dict=1,
+	)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_component_items_for_customer(doctype, txt, searchfield, start, page_len, filters):
+	"""Link query: MC Component items filtered to those belonging to the selected customer's
+	Master Cards. Falls back to all Component items when no customer is given."""
+	customer = (filters or {}).get("customer")
+	like_txt = f"%{txt}%"
+
+	if customer:
+		rows = frappe.db.sql(
+			"""
+			SELECT DISTINCT mci.item_code
+			FROM `tabMaster Card Item` mci
+			JOIN `tabMaster Card` mc ON mc.name = mci.parent
+			WHERE mc.customer = %(customer)s
+			  AND mc.disabled = 0
+			  AND mci.item_code IS NOT NULL
+			  AND mci.item_code != ''
+			""",
+			{"customer": customer},
+		)
+		item_codes = tuple(r[0] for r in rows if r[0])
+		if not item_codes:
+			return []
+
+		return frappe.db.sql(
+			"""
+			SELECT name, item_name FROM `tabItem`
+			WHERE item_group = 'Component'
+			  AND disabled = 0
+			  AND name IN %(item_codes)s
+			  AND (name LIKE %(txt)s OR item_name LIKE %(txt)s)
+			ORDER BY name
+			LIMIT %(page_len)s OFFSET %(start)s
+			""",
+			{
+				"item_codes": item_codes,
+				"txt": like_txt,
+				"start": int(start),
+				"page_len": int(page_len),
+			},
+		)
+
+	return frappe.db.sql(
+		"""
+		SELECT name, item_name FROM `tabItem`
+		WHERE item_group = 'Component'
+		  AND disabled = 0
+		  AND (name LIKE %(txt)s OR item_name LIKE %(txt)s)
+		ORDER BY name
+		LIMIT %(page_len)s OFFSET %(start)s
+		""",
+		{"txt": like_txt, "start": int(start), "page_len": int(page_len)},
 	)
 
 

@@ -22,6 +22,8 @@
   "idle",
   "p_qty",
   "c_qty",
+  "rmr",
+  "sr",
   "operators",
   "remark",
   "last_update",
@@ -79,7 +81,7 @@
    "fieldname": "so_no",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "SO No",
+   "label": "Sales Order",
    "options": "Sales Order",
    "read_only": 1
   },
@@ -87,7 +89,7 @@
    "default": "0",
    "fieldname": "so_qty",
    "fieldtype": "Float",
-   "label": "SO Qty",
+   "label": "JO Qty",
    "read_only": 1
   },
   {
@@ -99,21 +101,21 @@
   {
    "columns": 1,
    "fieldname": "t_start",
-   "fieldtype": "Datetime",
+   "fieldtype": "Time",
    "in_list_view": 1,
    "label": "T Start"
   },
   {
    "columns": 1,
    "fieldname": "t_sett",
-   "fieldtype": "Datetime",
+   "fieldtype": "Time",
    "in_list_view": 1,
    "label": "T Sett"
   },
   {
    "columns": 1,
    "fieldname": "t_stop",
-   "fieldtype": "Datetime",
+   "fieldtype": "Time",
    "in_list_view": 1,
    "label": "T Stop"
   },
@@ -156,10 +158,25 @@
    "label": "C Qty"
   },
   {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "rmr",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "RMR"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "sr",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "SR"
+  },
+  {
    "fieldname": "operators",
-   "fieldtype": "Table",
-   "label": "Operators",
-   "options": "Production Process Item Operator"
+   "fieldtype": "Data",
+   "label": "Operators"
   },
   {
    "fieldname": "remark",
@@ -167,10 +184,8 @@
    "label": "Remark"
   },
   {
-   "columns": 2,
    "fieldname": "last_update",
    "fieldtype": "Data",
-   "in_list_view": 1,
    "label": "Last Update",
    "read_only": 1
   },

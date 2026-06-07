@@ -38,13 +38,16 @@ class FGTS(StockController):
 	def before_submit(self):
 		if not self.items:
 			frappe.throw(_("At least one component is required"))
-		if not self.wip_warehouse or not self.fg_warehouse:
-			frappe.throw(_("Warehouses not resolved — save the document first"))
 		if not self.source_warehouse:
 			frappe.throw(_("Source Warehouse must be selected"))
+		source_warehouse = self._resolve_source_warehouse()
+		if not source_warehouse:
+			frappe.throw(_("Source warehouse could not be resolved — check IIB Settings"))
+		if not self.fg_warehouse:
+			frappe.throw(_("FG Warehouse not resolved — save the document first"))
 		if flt(self.total_qty) <= 0:
 			frappe.throw(_("Qty must be greater than zero"))
-		self._validate_wip_qty()
+		self._validate_stock(source_warehouse)
 
 	def on_submit(self):
 		"""Phase 1: Source Warehouse (RM or WIP) → Finished Goods."""
@@ -127,37 +130,64 @@ class FGTS(StockController):
 			return self.wip_warehouse
 
 	def _resolve_job_order_converting(self):
-		"""Find an active JO P2 for the first item if not already set."""
-		if not self.job_order_converting and self.items:
-			item_code = self.items[0].item_code
+		"""Link an active JO P2 if not already set.
+
+		Bundle FGTS rows hold component / packed items that are not the JO's
+		production_item, so matching on item_code alone misses them. We try
+		production_item across all rows first, then fall back to the Sales
+		Order allocated on the JO.
+		"""
+		if self.job_order_converting or not self.items:
+			return
+
+		active = ["in", ["In Process", "Completed"]]
+		item_codes = [r.item_code for r in self.items if r.item_code]
+
+		jo = None
+		if item_codes:
 			jo = frappe.db.get_value(
 				"Job Order Converting",
 				{
-					"production_item": item_code,
+					"production_item": ["in", item_codes],
 					"docstatus": 1,
-					"status": ["in", ["In Process", "Completed"]],
+					"status": active,
 				},
 				"name",
 				order_by="posting_date asc",
 			)
-			self.job_order_converting = jo or ""
+
+		if not jo and self.sales_order:
+			jo_list = frappe.get_all(
+				"Job Order Converting",
+				filters=[
+					["Job Order Converting Sales Order Item", "sales_order", "=", self.sales_order],
+					["docstatus", "=", 1],
+					["status", "in", ["In Process", "Completed"]],
+				],
+				pluck="name",
+				order_by="posting_date asc",
+				limit=1,
+			)
+			jo = jo_list[0] if jo_list else None
+
+		self.job_order_converting = jo or ""
 
 	def _calculate_total_qty(self):
 		"""Total Qty = Qty directly. BDL and Loose are informational only."""
 		self.total_qty = flt(self.qty)
 
-	def _validate_wip_qty(self):
+	def _validate_stock(self, warehouse):
+		"""Ensure each component row has at least total_qty available in `warehouse`."""
 		from erpnext.stock.utils import get_stock_balance
 
-		source_warehouse = self._resolve_source_warehouse()
 		for row in self.items:
-			source_qty = get_stock_balance(row.item_code, source_warehouse, self.posting_date)
-			if source_qty < flt(self.total_qty):
+			available = get_stock_balance(row.item_code, warehouse, self.posting_date)
+			if available < flt(self.total_qty):
 				frappe.throw(
 					_(
 						"Insufficient stock in {0} warehouse for {1}. "
 						"Available: {2}, Required: {3}"
-					).format(source_warehouse, row.item_code, source_qty, flt(self.total_qty))
+					).format(warehouse, row.item_code, available, flt(self.total_qty))
 				)
 
 	def _stock_uom(self, item_code):
@@ -168,19 +198,45 @@ class FGTS(StockController):
 	# -------------------------------------------------------------------------
 
 	def _move_stock(self, from_warehouse, to_warehouse, remarks_prefix="Transfer"):
-		"""Create SL + GL entries for all component rows in one warehouse movement."""
-		sl_entries = self._build_sl_entries(from_warehouse, to_warehouse)
+		"""Create SL + GL entries for all component rows in one warehouse movement.
+
+		Stock is transferred at the source warehouse's current valuation rate so
+		value is preserved across the move (no zero-rated receipts).
+		"""
+		rates = self._row_valuation(from_warehouse)
+		sl_entries = self._build_sl_entries(from_warehouse, to_warehouse, rates=rates)
 		if sl_entries:
 			self.make_sl_entries(sl_entries)
-		self._make_gl_entries(from_warehouse, to_warehouse, remarks_prefix)
+		total_amount = sum(flt(self.total_qty) * rates.get(r.item_code, 0) for r in self.items)
+		self._make_gl_entries(from_warehouse, to_warehouse, total_amount, remarks_prefix)
 
-	def _build_sl_entries(self, from_warehouse, to_warehouse, cancel=False):
+	def _row_valuation(self, warehouse):
+		"""Return {item_code: valuation_rate} at `warehouse` for all component rows."""
+		from erpnext.stock.utils import get_stock_balance
+
+		rates = {}
+		for row in self.items:
+			if not row.item_code or row.item_code in rates:
+				continue
+			_qty, rate = get_stock_balance(
+				row.item_code, warehouse, self.posting_date, with_valuation_rate=True
+			)
+			rates[row.item_code] = flt(rate)
+		return rates
+
+	def _build_sl_entries(self, from_warehouse, to_warehouse, cancel=False, rates=None):
 		"""Return a list of SL entry dicts for all component rows.
+
+		The incoming side is rated at the source warehouse's valuation rate so
+		stock value is preserved across the transfer.
 
 		When cancel=True the entries carry is_cancelled=1, which causes
 		make_sl_entries() to call set_as_cancel() (marks originals) and then
 		post proper reversal SLEs with updated stock balances.
 		"""
+		if rates is None:
+			rates = self._row_valuation(from_warehouse)
+
 		sl_entries = []
 		for row in self.items:
 			d = frappe._dict(
@@ -198,7 +254,7 @@ class FGTS(StockController):
 				d,
 				{
 					"actual_qty": flt(self.total_qty),
-					"incoming_rate": 0,
+					"incoming_rate": rates.get(row.item_code, 0),
 					"warehouse": to_warehouse,
 				},
 			)
@@ -208,11 +264,14 @@ class FGTS(StockController):
 			sl_entries.extend([out_entry, in_entry])
 		return sl_entries
 
-	def _make_gl_entries(self, from_warehouse, to_warehouse, remarks_prefix="Transfer"):
+	def _make_gl_entries(self, from_warehouse, to_warehouse, total_amount, remarks_prefix="Transfer"):
+		import erpnext
 		from erpnext.accounts.general_ledger import process_gl_map
 
-		total_amount = 0
-		if not total_amount:
+		total_amount = flt(total_amount)
+		if total_amount <= 0:
+			return
+		if not erpnext.is_perpetual_inventory_enabled(self.company):
 			return
 
 		source_account = frappe.get_cached_value("Warehouse", from_warehouse, "account")
@@ -262,7 +321,10 @@ class FGTS(StockController):
 			jo = frappe.get_doc("Job Order Converting", self.job_order_converting)
 			jo.update_produced_qty()
 		except Exception:
-			pass
+			frappe.log_error(
+				title="FGTS: failed to update Job Order Converting produced qty",
+				message=frappe.get_traceback(),
+			)
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +351,7 @@ def get_fgts_details(sales_order):
 	packed_rows = frappe.db.get_all(
 		"Packed Item",
 		{"parent": sales_order, "parenttype": "Sales Order"},
-		["item_code", "item_name"],
+		["item_code", "item_name", "parent_detail_docname"],
 		order_by="idx asc",
 	)
 	if packed_rows:
@@ -298,6 +360,7 @@ def get_fgts_details(sales_order):
 				customer=customer,
 				item_code=p.item_code,
 				item_name=p.item_name or "",
+				sales_order_item=p.parent_detail_docname or "",
 				wip_warehouse=wip_wh,
 				fg_warehouse=fg_wh,
 			))
@@ -306,7 +369,7 @@ def get_fgts_details(sales_order):
 		so_items = frappe.db.get_all(
 			"Sales Order Item",
 			{"parent": sales_order},
-			["item_code", "item_name"],
+			["name", "item_code", "item_name"],
 			order_by="idx asc",
 		)
 		for item in so_items:
@@ -314,6 +377,7 @@ def get_fgts_details(sales_order):
 				customer=customer,
 				item_code=item.item_code,
 				item_name=item.item_name or "",
+				sales_order_item=item.name,
 				wip_warehouse=wip_wh,
 				fg_warehouse=fg_wh,
 			))
@@ -321,8 +385,12 @@ def get_fgts_details(sales_order):
 	return results
 
 
-def _build_entry(customer, item_code, item_name, wip_warehouse, fg_warehouse):
-	"""Build a single FGTS-fill dict for one component."""
+def _build_entry(customer, item_code, item_name, sales_order_item, wip_warehouse, fg_warehouse):
+	"""Build a single FGTS-fill dict for one component.
+
+	`sales_order_item` is the Sales Order Item row name this component traces to
+	(for packed/bundle items this is the parent SO line, not the packed row).
+	"""
 	mc_item = frappe.db.get_value(
 		"Master Card Item", {"item_code": item_code}, ["parent", "component"], as_dict=True
 	)
@@ -333,6 +401,7 @@ def _build_entry(customer, item_code, item_name, wip_warehouse, fg_warehouse):
 		"customer": customer,
 		"item_code": item_code,
 		"item_name": item_name,
+		"sales_order_item": sales_order_item,
 		"master_card": master_card,
 		"component": component,
 		"wip_warehouse": wip_warehouse,
@@ -342,24 +411,33 @@ def _build_entry(customer, item_code, item_name, wip_warehouse, fg_warehouse):
 
 
 @frappe.whitelist()
-def get_item_warehouse_quantities(item_code, posting_date):
-	"""Get current stock quantities for an item across all warehouses (RM, WIP, FG, Stores)."""
+def get_items_warehouse_quantities(item_codes, posting_date):
+	"""Batched stock balances (RM/WIP/FG/Stores) for many items in one call.
+
+	`item_codes` is a JSON list. Returns
+	{item_code: {rm_qty, wip_qty, fg_qty, stores_qty}}.
+	"""
 	from erpnext.stock.utils import get_stock_balance
 
 	frappe.has_permission("FGTS", "read", throw=True)
-	settings = frappe.get_cached_doc("IIB Settings")
+	if isinstance(item_codes, str):
+		item_codes = frappe.parse_json(item_codes)
 
+	settings = frappe.get_cached_doc("IIB Settings")
 	rm_warehouse = settings.default_raw_material_warehouse or "Raw Material - IIB"
 	wip_warehouse = settings.default_wip_warehouse or ""
 	fg_warehouse = settings.default_fg_warehouse or ""
 	stores_warehouse = "Stores - IIB"
 
-	return {
-		"rm_qty": flt(get_stock_balance(item_code, rm_warehouse, posting_date)),
-		"wip_qty": flt(get_stock_balance(item_code, wip_warehouse, posting_date)) if wip_warehouse else 0,
-		"fg_qty": flt(get_stock_balance(item_code, fg_warehouse, posting_date)) if fg_warehouse else 0,
-		"stores_qty": flt(get_stock_balance(item_code, stores_warehouse, posting_date)),
-	}
+	out = {}
+	for item_code in dict.fromkeys(item_codes or []):
+		out[item_code] = {
+			"rm_qty": flt(get_stock_balance(item_code, rm_warehouse, posting_date)),
+			"wip_qty": flt(get_stock_balance(item_code, wip_warehouse, posting_date)) if wip_warehouse else 0,
+			"fg_qty": flt(get_stock_balance(item_code, fg_warehouse, posting_date)) if fg_warehouse else 0,
+			"stores_qty": flt(get_stock_balance(item_code, stores_warehouse, posting_date)),
+		}
+	return out
 
 
 @frappe.whitelist()
@@ -373,6 +451,7 @@ def approve_qc(name):
 	if doc.status != "Waiting QC":
 		frappe.throw(_("FGTS status must be 'Waiting QC' to approve"))
 
+	doc._validate_stock(doc.fg_warehouse)
 	doc._move_stock(doc.fg_warehouse, doc.stores_warehouse, "FG to Stores")
 	doc.db_set("status", "OK QC")
 	doc.db_set("fg_to_stores_done", 1)
