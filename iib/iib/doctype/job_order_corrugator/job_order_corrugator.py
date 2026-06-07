@@ -304,30 +304,81 @@ class JobOrderCorrugator(Document):
 	# ---- SO Item JO P1 qty sync ----
 
 	def update_so_item_corrugator_qty(self):
-		"""Recompute custom_corrugator_qty on each affected Sales Order Item.
+		"""Recompute custom_corrugator_qty on each affected SO Item or Packed Item.
+
+		- Non-bundle SO lines: update Sales Order Item.custom_corrugator_qty.
+		- Bundle SO lines: update Packed Item.custom_corrugator_qty per component,
+		  because the bundle parent qty is not meaningful for corrugator tracking.
 
 		Called after submit AND cancel so the field always reflects the live
-		total of all submitted (docstatus=1) JO P1 Item qtys for that SO line.
+		total of all submitted (docstatus=1) JO P1 Item qtys.
 		"""
-		so_item_names = {r.sales_order_item for r in self.items if r.sales_order_item}
-		for so_item_name in so_item_names:
-			recomputed = frappe.db.sql(
-				"""
-				SELECT IFNULL(SUM(i.qty), 0)
-				FROM `tabJob Order Corrugator Item` i
-				JOIN `tabJob Order Corrugator` p ON p.name = i.parent
-				WHERE i.sales_order_item = %s
-				  AND p.docstatus = 1
-				""",
-				(so_item_name,),
-			)[0][0]
-			frappe.db.set_value(
-				"Sales Order Item",
-				so_item_name,
-				"custom_corrugator_qty",
-				flt(recomputed),
-				update_modified=False,
-			)
+		# Collect (so_item_name → {sales_order, item_codes}) from this JOP1's rows
+		so_item_data: dict = {}
+		for r in self.items:
+			if not r.sales_order_item:
+				continue
+			entry = so_item_data.setdefault(r.sales_order_item, {"sales_order": r.sales_order, "item_codes": set()})
+			if r.item_code:
+				entry["item_codes"].add(r.item_code)
+
+		for so_item_name, data in so_item_data.items():
+			so_item_code = frappe.db.get_value("Sales Order Item", so_item_name, "item_code")
+			if not so_item_code:
+				continue
+
+			is_bundle = bool(frappe.db.exists("Product Bundle", so_item_code))
+
+			if is_bundle:
+				# Update Packed Item.custom_corrugator_qty for each component separately
+				for item_code in data["item_codes"]:
+					recomputed = frappe.db.sql(
+						"""
+						SELECT IFNULL(SUM(i.qty), 0)
+						FROM `tabJob Order Corrugator Item` i
+						JOIN `tabJob Order Corrugator` p ON p.name = i.parent
+						WHERE i.sales_order_item = %s
+						  AND i.item_code = %s
+						  AND p.docstatus = 1
+						""",
+						(so_item_name, item_code),
+					)[0][0]
+					packed_item_name = frappe.db.get_value(
+						"Packed Item",
+						{
+							"parent": data["sales_order"],
+							"parent_detail_docname": so_item_name,
+							"item_code": item_code,
+						},
+						"name",
+					)
+					if packed_item_name:
+						frappe.db.set_value(
+							"Packed Item",
+							packed_item_name,
+							"custom_corrugator_qty",
+							flt(recomputed),
+							update_modified=False,
+						)
+			else:
+				# Non-bundle: update Sales Order Item directly
+				recomputed = frappe.db.sql(
+					"""
+					SELECT IFNULL(SUM(i.qty), 0)
+					FROM `tabJob Order Corrugator Item` i
+					JOIN `tabJob Order Corrugator` p ON p.name = i.parent
+					WHERE i.sales_order_item = %s
+					  AND p.docstatus = 1
+					""",
+					(so_item_name,),
+				)[0][0]
+				frappe.db.set_value(
+					"Sales Order Item",
+					so_item_name,
+					"custom_corrugator_qty",
+					flt(recomputed),
+					update_modified=False,
+				)
 
 	# ---- post-receipt recompute ----
 

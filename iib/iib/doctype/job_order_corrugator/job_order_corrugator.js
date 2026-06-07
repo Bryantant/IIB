@@ -27,7 +27,7 @@ frappe.ui.form.on("Job Order Corrugator", {
 		add_create_receipt_button(frm);
 		add_status_buttons(frm);
 		restrict_required_date(frm);
-		recalc_all_rows(frm);
+		fetch_missing_item_specs(frm);
 	},
 	transaction_date(frm) {
 		restrict_required_date(frm);
@@ -81,6 +81,9 @@ frappe.ui.form.on("Job Order Corrugator Item", {
 				}
 			},
 		});
+		// fetch_from only fires on manual UI selection; explicitly fetch spec
+		// fields so rows added via "Get Items" or loaded from DB are also filled.
+		fetch_item_spec(frm, cdt, cdn, row.item_code);
 	},
 
 	// Fetch fields fire after the AJAX response for fetch_from resolves — correct
@@ -112,6 +115,64 @@ frappe.ui.form.on("Job Order Corrugator Item", {
 		recalc_row(frm, cdt, cdn);
 	},
 });
+
+// ---------------------------------------------------------------------------
+// Item spec fetch helpers
+// ---------------------------------------------------------------------------
+
+// Fetch spec fields from Item Master for a single row and then recalculate.
+// fetch_from in the JSON only fires on manual UI interaction; this covers rows
+// loaded from DB or added programmatically via "Get Items From SO".
+function fetch_item_spec(frm, cdt, cdn, item_code) {
+	if (!item_code) return;
+	frappe.db.get_value(
+		"Item",
+		item_code,
+		[
+			"custom_board_quality", "custom_flute", "custom_single_double",
+			"custom_width", "custom_length", "custom_dc", "custom_set_pcs",
+			"custom_crease_w", "custom_crease_l", "custom_slotting",
+			"custom_display", "custom_joint_1", "custom_joint_2",
+		],
+		(r) => {
+			if (!r) return;
+			frappe.model.set_value(cdt, cdn, {
+				quality:       r.custom_board_quality  || "",
+				flute:         r.custom_flute          || "",
+				single_double: r.custom_single_double  || "",
+				width:         r.custom_width          || 0,
+				length:        r.custom_length         || 0,
+				dc:            r.custom_dc             || 0,
+				set_pcs:       r.custom_set_pcs        || 0,
+				crease_w:      r.custom_crease_w       || "",
+				crease_l:      r.custom_crease_l       || "",
+				slotting:      r.custom_slotting       || "",
+				display:       r.custom_display        || 0,
+				joint_1:       r.custom_joint_1        || "",
+				joint_2:       r.custom_joint_2        || "",
+			});
+			recalc_row(frm, cdt, cdn);
+			// Re-render the open row dialog so depends_on conditions re-evaluate
+			// and the Board Spec / Crease & Joints sections become visible.
+			const grid = frm.fields_dict.items && frm.fields_dict.items.grid;
+			if (grid && grid.grid_form && grid.grid_form.fields_dict) {
+				grid.grid_form.refresh();
+			}
+		}
+	);
+}
+
+// On refresh, find any rows that have item_code but haven't had their spec
+// fields populated yet (quality is blank) and fetch them.
+function fetch_missing_item_specs(frm) {
+	(frm.doc.items || []).forEach((row) => {
+		if (row.item_code && !row.quality) {
+			fetch_item_spec(frm, row.doctype, row.name, row.item_code);
+		} else {
+			recalc_row(frm, row.doctype, row.name);
+		}
+	});
+}
 
 // ---------------------------------------------------------------------------
 // Production calculation helpers (display / print only — no business logic)

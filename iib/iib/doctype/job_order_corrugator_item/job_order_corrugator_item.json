@@ -16,12 +16,22 @@
   "customer_part_no",
   "sec_board_spec",
   "quality",
+  "flute",
   "width",
   "length",
   "col_break_board_spec",
   "dc",
+  "single_double",
   "set_pcs",
   "uom",
+  "sec_crease_joints",
+  "crease_w",
+  "crease_l",
+  "slotting",
+  "col_break_crease_joints",
+  "display",
+  "joint_1",
+  "joint_2",
   "sec_qty",
   "qty",
   "col_break_qty",
@@ -57,6 +67,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "depends_on": "eval:doc.item_code",
    "fieldname": "sec_board_spec",
    "fieldtype": "Section Break",
    "label": "Board Spec"
@@ -73,6 +84,60 @@
   {
    "fieldname": "col_break_qty",
    "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.item_code",
+   "fieldname": "sec_crease_joints",
+   "fieldtype": "Section Break",
+   "label": "Crease & Joints"
+  },
+  {
+   "fetch_from": "item_code.custom_crease_w",
+   "fieldname": "crease_w",
+   "fieldtype": "Data",
+   "label": "Crease W",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_crease_l",
+   "fieldname": "crease_l",
+   "fieldtype": "Data",
+   "label": "Crease L",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_slotting",
+   "fieldname": "slotting",
+   "fieldtype": "Data",
+   "label": "Slotting",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_crease_joints",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "item_code.custom_display",
+   "fieldname": "display",
+   "fieldtype": "Check",
+   "label": "Display",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_joint_1",
+   "fieldname": "joint_1",
+   "fieldtype": "Select",
+   "label": "Joint 1",
+   "options": "\nGLUED\nSTITCHED\nHOT MELT\nTAPED\nFLAT\nRIVET",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_joint_2",
+   "fieldname": "joint_2",
+   "fieldtype": "Select",
+   "label": "Joint 2",
+   "options": "\nGLUED\nSTITCHED\nHOT MELT\nTAPED\nFLAT\nRIVET",
+   "read_only": 1
   },
   {
    "fieldname": "sec_machine_settings",
@@ -137,6 +202,7 @@
    "reqd": 1
   },
   {
+   "columns": 2,
    "fieldname": "item_code",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -229,6 +295,14 @@
    "read_only": 1
   },
   {
+   "fetch_from": "item_code.custom_flute",
+   "fieldname": "flute",
+   "fieldtype": "Link",
+   "label": "Flute",
+   "options": "Flute",
+   "read_only": 1
+  },
+  {
    "fetch_from": "item_code.custom_board_quality",
    "fieldname": "quality",
    "fieldtype": "Link",
@@ -255,6 +329,14 @@
    "fieldname": "dc",
    "fieldtype": "Int",
    "label": "D/C",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_single_double",
+   "fieldname": "single_double",
+   "fieldtype": "Select",
+   "label": "Single/Double",
+   "options": "\nSingle A\nSingle B/C\nDouble BC\nDouble AB",
    "read_only": 1
   },
   {
@@ -291,7 +373,7 @@
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-06-06 13:28:11.947242",
+ "modified": "2026-06-06 16:07:49.584512",
  "modified_by": "Administrator",
  "module": "IIB",
  "name": "Job Order Corrugator Item",
