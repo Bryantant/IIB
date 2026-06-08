@@ -266,6 +266,11 @@ fixtures = [
     {"dt": "Server Script", "filters": [["module", "=", "IIB"]]},
     {"dt": "Item Group", "filters": [["name", "in", ["Master Card", "Sub Assemblies", "Component"]]]},
     "Translation",
+    "Board Quality",
+    "Colour",
+    "Flute",
+    "Item Description",
+    "IIB Production Section",
     # Custom DocPerm is managed by IIB Feature Control (iib_feature_control.py)
     # and must NOT be stored as a fixture — bench migrate applies fixtures AFTER
     # patches, which would re-create stale entries on top of the controller's work.

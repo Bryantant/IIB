@@ -1,0 +1,100 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "LAYER PAD",
+  "modified": "2026-05-20 14:06:29.188634",
+  "name": "LAYER PAD"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "PULP TRAY",
+  "modified": "2026-05-20 14:06:39.003492",
+  "name": "PULP TRAY"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "S/W PLAIN RSC",
+  "modified": "2026-05-21 21:47:16.674486",
+  "name": "S/W PLAIN RSC"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "BOTTOM PAD",
+  "modified": "2026-05-30 16:22:55.466407",
+  "name": "BOTTOM PAD"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "PAD",
+  "modified": "2026-05-30 16:23:02.064961",
+  "name": "PAD"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "TOP PAD A",
+  "modified": "2026-05-30 16:23:08.137758",
+  "name": "TOP PAD A"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "TRAY",
+  "modified": "2026-05-30 16:23:13.473578",
+  "name": "TRAY"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "D/W OUTER BOX",
+  "modified": "2026-06-03 19:21:08.123789",
+  "name": "D/W OUTER BOX"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "PAPER CORE",
+  "modified": "2026-06-05 12:30:35.590857",
+  "name": "PAPER CORE"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "PLAIN D/C WEDGE",
+  "modified": "2026-06-05 15:38:39.750456",
+  "name": "PLAIN D/C WEDGE"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "D/C PAD",
+  "modified": "2026-06-05 15:38:47.300963",
+  "name": "D/C PAD"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "PRINTED D/C BOX",
+  "modified": "2026-05-20 14:06:19.969019",
+  "name": "PRINTED D/C BOX"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "PLAIN D/C BOX",
+  "modified": "2026-05-14 23:58:33.683760",
+  "name": "PLAIN D/C BOX"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Item Description",
+  "item_description": "TOP COVER",
+  "modified": "2026-05-20 14:06:46.182876",
+  "name": "TOP COVER"
+ }
+]
