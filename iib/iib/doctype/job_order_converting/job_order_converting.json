@@ -37,7 +37,6 @@
   "operations",
   "sec_warehouses_hidden",
   "wip_warehouse",
-  "fg_warehouse",
   "sec_result",
   "transfer_rm_doc",
   "amended_from"
@@ -239,14 +238,6 @@
    "fieldtype": "Link",
    "hidden": 1,
    "label": "WIP Warehouse",
-   "options": "Warehouse",
-   "read_only": 1
-  },
-  {
-   "fieldname": "fg_warehouse",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "FG Warehouse",
    "options": "Warehouse",
    "read_only": 1
   },

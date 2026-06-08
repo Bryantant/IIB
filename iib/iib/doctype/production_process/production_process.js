@@ -1,9 +1,6 @@
 frappe.ui.form.on("Production Process", {
 	setup(frm) {
 		frm.set_query("section", () => ({ filters: { is_group: 0 } }));
-		frm.set_query("daily_production_schedule", () => ({
-			filters: frm.doc.section ? { section: frm.doc.section } : {},
-		}));
 		frm.set_query("job_order_converting", "items", () => ({
 			query: "iib.iib.doctype.production_process.production_process.get_job_orders_for_section",
 			filters: { section: frm.doc.section || "" },
@@ -15,6 +12,14 @@ frappe.ui.form.on("Production Process", {
 		frm.set_query("reject_reason", "rejects", () => ({}));
 	},
 
+	onload(frm) {
+		// DPS Date defaults to the posting date; they can differ if a PP records against
+		// a prior day's schedule.
+		if (!frm.doc.dps_date && frm.doc.posting_date) {
+			frm.set_value("dps_date", frm.doc.posting_date);
+		}
+	},
+
 	refresh(frm) {
 		set_status_indicator(frm);
 		render_fetch_dps_btn(frm);
@@ -23,9 +28,37 @@ frappe.ui.form.on("Production Process", {
 	},
 
 	section(frm) {
-		frm.set_value("daily_production_schedule", "");
+		resolve_dps(frm);
+	},
+
+	dps_date(frm) {
+		resolve_dps(frm);
 	},
 });
+
+// Resolve the read-only Daily Production Schedule link from (section, DPS Date).
+function resolve_dps(frm) {
+	if (!frm.doc.section || !frm.doc.dps_date) {
+		frm.set_value("daily_production_schedule", "");
+		return;
+	}
+	frappe.call({
+		method: "iib.iib.doctype.production_process.production_process.resolve_dps",
+		args: { section: frm.doc.section, dps_date: frm.doc.dps_date },
+		callback(r) {
+			frm.set_value("daily_production_schedule", r.message || "");
+			if (!r.message) {
+				frappe.show_alert({
+					message: __("No Daily Production Schedule for {0} on {1}", [
+						frm.doc.section,
+						frappe.datetime.str_to_user(frm.doc.dps_date),
+					]),
+					indicator: "orange",
+				});
+			}
+		},
+	});
+}
 
 // ---- Status indicator ----
 
@@ -133,22 +166,22 @@ function add_job_by_item(frm) {
 }
 
 function run_fetch_from_dps(frm) {
-	if (!frm.doc.daily_production_schedule) {
+	if (!frm.doc.section || !frm.doc.dps_date) {
 		frappe.show_alert({
-			message: __("Set Daily Production Schedule first"),
+			message: __("Set Section and DPS Date first"),
 			indicator: "orange",
 		});
 		return;
 	}
 	frappe.call({
 		method: "iib.iib.doctype.production_process.production_process.fetch_from_dps",
-		args: { daily_production_schedule: frm.doc.daily_production_schedule },
+		args: { section: frm.doc.section, dps_date: frm.doc.dps_date },
 		freeze: true,
 		freeze_message: __("Loading from schedule..."),
 		callback(r) {
 			if (!r.message?.length) {
 				frappe.show_alert({
-					message: __("No jobs found in the schedule"),
+					message: __("No jobs found in the schedule for that date"),
 					indicator: "orange",
 				});
 				return;

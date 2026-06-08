@@ -12,10 +12,10 @@
   "status",
   "sec_details",
   "section",
-  "sales_order",
-  "so_item_select",
-  "col_break_2",
   "customer",
+  "sales_order",
+  "col_break_2",
+  "so_item_select",
   "sec_items",
   "items",
   "sec_qty",
@@ -27,12 +27,9 @@
   "sec_warehouses",
   "source_warehouse",
   "wip_warehouse",
-  "fg_warehouse",
   "stores_warehouse",
   "sec_internal",
   "job_order_converting",
-  "wip_to_fg_done",
-  "fg_to_stores_done",
   "cost_center",
   "amended_from"
  ],
@@ -109,9 +106,10 @@
    "fieldname": "customer",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Customer",
    "options": "Customer",
-   "read_only": 1
+   "reqd": 1
   },
   {
    "fieldname": "sec_items",
@@ -181,14 +179,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "fg_warehouse",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "FG Warehouse",
-   "options": "Warehouse",
-   "read_only": 1
-  },
-  {
    "default": "Stores - IIB",
    "fieldname": "stores_warehouse",
    "fieldtype": "Link",
@@ -208,20 +198,6 @@
    "hidden": 1,
    "label": "Job Order Converting",
    "options": "Job Order Converting"
-  },
-  {
-   "default": "0",
-   "fieldname": "wip_to_fg_done",
-   "fieldtype": "Check",
-   "hidden": 1,
-   "label": "WIP to FG Done"
-  },
-  {
-   "default": "0",
-   "fieldname": "fg_to_stores_done",
-   "fieldtype": "Check",
-   "hidden": 1,
-   "label": "FG to Stores Done"
   },
   {
    "fieldname": "cost_center",

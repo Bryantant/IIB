@@ -16,9 +16,12 @@ class FGTS(StockController):
 
 	"""Finished Goods Tracking System.
 
-	Two-phase stock movement:
-	  Phase 1 (Submit → Waiting QC):  WIP Warehouse → Finished Goods Warehouse
-	  Phase 2 (Approve QC → OK QC):   Finished Goods Warehouse → Stores
+	Single QC-gated stock movement:
+	  Submit → Waiting QC:  document is locked, NO stock movement yet.
+	  Approve QC → OK QC:   Source Warehouse (RM or WIP) → Stores (direct).
+
+	Stock is released to Stores only once QC passes; there is no intermediate
+	Finished Goods leg.
 
 	Qty / BDL / Loose are header-level and shared across all component rows.
 	Total Qty = Qty (BDL and Loose are informational only, not used in calculations).
@@ -43,42 +46,32 @@ class FGTS(StockController):
 		source_warehouse = self._resolve_source_warehouse()
 		if not source_warehouse:
 			frappe.throw(_("Source warehouse could not be resolved — check IIB Settings"))
-		if not self.fg_warehouse:
-			frappe.throw(_("FG Warehouse not resolved — save the document first"))
+		if not self.stores_warehouse:
+			frappe.throw(_("Stores Warehouse not resolved"))
 		if flt(self.total_qty) <= 0:
 			frappe.throw(_("Qty must be greater than zero"))
-		self._validate_stock(source_warehouse)
 
 	def on_submit(self):
-		"""Phase 1: Source Warehouse (RM or WIP) → Finished Goods."""
-		source_warehouse = self._resolve_source_warehouse()
-		self._move_stock(source_warehouse, self.fg_warehouse, "Source to FG")
+		"""Lock the document and mark it pending QC. No stock moves yet."""
 		self.db_set("status", "Waiting QC")
-		self.db_set("wip_to_fg_done", 1)
 		self._update_jo_produced_qty()
 
 	def on_cancel(self):
 		self.ignore_linked_doctypes = ("GL Entry", "Stock Ledger Entry")
-		source_warehouse = self._resolve_source_warehouse()
 
-		# Cancel SLEs in reverse phase order — ERPNext's make_sl_entries with
-		# is_cancelled=1 calls set_as_cancel() to mark originals, then posts
-		# proper reversal entries and reposts stock balances.
-		# Collect all cancellation entries in one batch so set_as_cancel fires once.
-		cancel_sl = []
-		if self.fg_to_stores_done:
-			cancel_sl.extend(
-				self._build_sl_entries(self.fg_warehouse, self.stores_warehouse, cancel=True)
+		# Stock is only moved (Source → Stores) when QC is approved (status OK QC).
+		# Reverse it only if that move actually happened. make_sl_entries with
+		# is_cancelled=1 marks the originals, posts reversal entries, and reposts
+		# stock balances.
+		if self.status == "OK QC":
+			source_warehouse = self._resolve_source_warehouse()
+			cancel_sl = self._build_sl_entries(
+				source_warehouse, self.stores_warehouse, cancel=True
 			)
-		if self.wip_to_fg_done:
-			cancel_sl.extend(
-				self._build_sl_entries(source_warehouse, self.fg_warehouse, cancel=True)
-			)
-		if cancel_sl:
-			self.make_sl_entries(cancel_sl)
-
-		# Cancel GL entries using the standard AccountsController method
-		self.make_gl_entries_on_cancel()
+			if cancel_sl:
+				self.make_sl_entries(cancel_sl)
+			# Cancel GL entries using the standard AccountsController method
+			self.make_gl_entries_on_cancel()
 
 		self.db_set("status", "Cancelled")
 		self._update_jo_produced_qty()
@@ -95,23 +88,15 @@ class FGTS(StockController):
 		if not self.stores_warehouse:
 			self.stores_warehouse = "Stores - IIB"
 
-		# Try to get warehouses from linked JO P2 first
-		if self.job_order_converting and (not self.wip_warehouse or not self.fg_warehouse):
-			jo_wh = frappe.db.get_value(
-				"Job Order Converting",
-				self.job_order_converting,
-				["wip_warehouse", "fg_warehouse"],
-				as_dict=True,
+		# Try to get the WIP source warehouse from linked JO P2 first
+		if self.job_order_converting and not self.wip_warehouse:
+			self.wip_warehouse = frappe.db.get_value(
+				"Job Order Converting", self.job_order_converting, "wip_warehouse"
 			)
-			if jo_wh:
-				self.wip_warehouse = self.wip_warehouse or jo_wh.wip_warehouse
-				self.fg_warehouse = self.fg_warehouse or jo_wh.fg_warehouse
 
 		# Fall back to IIB Settings defaults
 		if not self.wip_warehouse:
 			self.wip_warehouse = frappe.db.get_single_value("IIB Settings", "default_wip_warehouse")
-		if not self.fg_warehouse:
-			self.fg_warehouse = frappe.db.get_single_value("IIB Settings", "default_fg_warehouse")
 		if not self.cost_center:
 			self.cost_center = frappe.db.get_single_value(
 				"IIB Settings", "default_cost_center"
@@ -343,7 +328,6 @@ def get_fgts_details(sales_order):
 	customer = frappe.db.get_value("Sales Order", sales_order, "customer")
 	settings = frappe.get_cached_doc("IIB Settings")
 	wip_wh = settings.default_wip_warehouse or ""
-	fg_wh = settings.default_fg_warehouse or ""
 
 	results = []
 
@@ -362,7 +346,6 @@ def get_fgts_details(sales_order):
 				item_name=p.item_name or "",
 				sales_order_item=p.parent_detail_docname or "",
 				wip_warehouse=wip_wh,
-				fg_warehouse=fg_wh,
 			))
 	else:
 		# --- Sales Order Items directly ---
@@ -379,13 +362,12 @@ def get_fgts_details(sales_order):
 				item_name=item.item_name or "",
 				sales_order_item=item.name,
 				wip_warehouse=wip_wh,
-				fg_warehouse=fg_wh,
 			))
 
 	return results
 
 
-def _build_entry(customer, item_code, item_name, sales_order_item, wip_warehouse, fg_warehouse):
+def _build_entry(customer, item_code, item_name, sales_order_item, wip_warehouse):
 	"""Build a single FGTS-fill dict for one component.
 
 	`sales_order_item` is the Sales Order Item row name this component traces to
@@ -405,17 +387,16 @@ def _build_entry(customer, item_code, item_name, sales_order_item, wip_warehouse
 		"master_card": master_card,
 		"component": component,
 		"wip_warehouse": wip_warehouse,
-		"fg_warehouse": fg_warehouse,
 		"stores_warehouse": "Stores - IIB",
 	}
 
 
 @frappe.whitelist()
 def get_items_warehouse_quantities(item_codes, posting_date):
-	"""Batched stock balances (RM/WIP/FG/Stores) for many items in one call.
+	"""Batched stock balances (RM/WIP/Stores) for many items in one call.
 
 	`item_codes` is a JSON list. Returns
-	{item_code: {rm_qty, wip_qty, fg_qty, stores_qty}}.
+	{item_code: {rm_qty, wip_qty, stores_qty}}.
 	"""
 	from erpnext.stock.utils import get_stock_balance
 
@@ -426,7 +407,6 @@ def get_items_warehouse_quantities(item_codes, posting_date):
 	settings = frappe.get_cached_doc("IIB Settings")
 	rm_warehouse = settings.default_raw_material_warehouse or "Raw Material - IIB"
 	wip_warehouse = settings.default_wip_warehouse or ""
-	fg_warehouse = settings.default_fg_warehouse or ""
 	stores_warehouse = "Stores - IIB"
 
 	out = {}
@@ -434,7 +414,6 @@ def get_items_warehouse_quantities(item_codes, posting_date):
 		out[item_code] = {
 			"rm_qty": flt(get_stock_balance(item_code, rm_warehouse, posting_date)),
 			"wip_qty": flt(get_stock_balance(item_code, wip_warehouse, posting_date)) if wip_warehouse else 0,
-			"fg_qty": flt(get_stock_balance(item_code, fg_warehouse, posting_date)) if fg_warehouse else 0,
 			"stores_qty": flt(get_stock_balance(item_code, stores_warehouse, posting_date)),
 		}
 	return out
@@ -442,7 +421,11 @@ def get_items_warehouse_quantities(item_codes, posting_date):
 
 @frappe.whitelist()
 def approve_qc(name):
-	"""Phase 2: FG → Stores. Called from the Approve QC button."""
+	"""On QC approval, move stock Source Warehouse (RM or WIP) → Stores directly.
+
+	This is the only stock movement in the FGTS lifecycle. Called from the
+	Approve QC button.
+	"""
 	frappe.has_permission("FGTS", "write", throw=True)
 	doc = frappe.get_doc("FGTS", name)
 
@@ -451,8 +434,8 @@ def approve_qc(name):
 	if doc.status != "Waiting QC":
 		frappe.throw(_("FGTS status must be 'Waiting QC' to approve"))
 
-	doc._validate_stock(doc.fg_warehouse)
-	doc._move_stock(doc.fg_warehouse, doc.stores_warehouse, "FG to Stores")
+	source_warehouse = doc._resolve_source_warehouse()
+	doc._validate_stock(source_warehouse)
+	doc._move_stock(source_warehouse, doc.stores_warehouse, "Source to Stores")
 	doc.db_set("status", "OK QC")
-	doc.db_set("fg_to_stores_done", 1)
 	return "OK QC"

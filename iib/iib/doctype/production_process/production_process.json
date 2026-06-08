@@ -12,6 +12,7 @@
   "amended_from",
   "sec_details",
   "section",
+  "dps_date",
   "daily_production_schedule",
   "sn",
   "col_break_details",
@@ -77,10 +78,18 @@
    "reqd": 1
   },
   {
+   "default": "Today",
+   "description": "Pick the schedule day; the matching Daily Production Schedule for this section is resolved automatically.",
+   "fieldname": "dps_date",
+   "fieldtype": "Date",
+   "label": "DPS Date"
+  },
+  {
    "fieldname": "daily_production_schedule",
    "fieldtype": "Link",
    "label": "Daily Production Schedule",
-   "options": "Daily Production Schedule"
+   "options": "Daily Production Schedule",
+   "read_only": 1
   },
   {
    "fieldname": "sn",

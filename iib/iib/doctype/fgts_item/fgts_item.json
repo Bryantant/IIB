@@ -12,7 +12,6 @@
   "col_break_1",
   "rm_qty",
   "wip_qty",
-  "fg_qty",
   "stores_qty",
   "col_break_2",
   "basic_rate"
@@ -74,15 +73,6 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "WIP Qty",
-   "read_only": 1
-  },
-  {
-   "columns": 1,
-   "default": "0",
-   "fieldname": "fg_qty",
-   "fieldtype": "Float",
-   "in_list_view": 1,
-   "label": "FG Qty",
    "read_only": 1
   },
   {

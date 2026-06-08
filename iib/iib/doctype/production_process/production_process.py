@@ -15,6 +15,7 @@ class ProductionProcess(Document):
 
 	def validate(self):
 		self._block_duplicate()
+		self._resolve_dps()
 		self._validate_dps_section()
 		self._validate_reject_uniqueness()
 		self._validate_reject_totals()
@@ -37,6 +38,14 @@ class ProductionProcess(Document):
 		# query in _write_back_completed_qty will naturally exclude this doc.
 		self._write_back_completed_qty()
 		self.db_set("status", "Cancelled")
+
+	def _resolve_dps(self):
+		"""Auto-fill the Daily Production Schedule link from (section, DPS Date). The link is
+		read-only — the user picks a date and we resolve the unique DPS for that section+date."""
+		if self.section and self.dps_date:
+			self.daily_production_schedule = get_dps_for(self.section, self.dps_date) or ""
+		else:
+			self.daily_production_schedule = ""
 
 	def _validate_dps_section(self):
 		"""Ensure the linked Daily Production Schedule is for the same section as this PP."""
@@ -215,9 +224,33 @@ class ProductionProcess(Document):
 			frappe.get_doc("Job Order Converting", jo_name)._refresh_header_status()
 
 
+def get_dps_for(section, dps_date):
+	"""The unique Daily Production Schedule for a section on a given date, or None.
+	(DPS enforces one document per section + posting_date.)"""
+	if not (section and dps_date):
+		return None
+	return frappe.db.get_value(
+		"Daily Production Schedule",
+		{"section": section, "posting_date": dps_date},
+		"name",
+		order_by="creation desc",
+	)
+
+
 @frappe.whitelist()
-def fetch_from_dps(daily_production_schedule):
+def resolve_dps(section, dps_date):
+	"""Client helper: resolve the DPS name for (section, date) to auto-fill the link."""
 	frappe.has_permission("Production Process", "read", throw=True)
+	return get_dps_for(section, dps_date)
+
+
+@frappe.whitelist()
+def fetch_from_dps(daily_production_schedule=None, section=None, dps_date=None):
+	frappe.has_permission("Production Process", "read", throw=True)
+	if not daily_production_schedule and section and dps_date:
+		daily_production_schedule = get_dps_for(section, dps_date)
+	if not daily_production_schedule:
+		return []
 	dps = frappe.get_doc("Daily Production Schedule", daily_production_schedule)
 
 	results = []

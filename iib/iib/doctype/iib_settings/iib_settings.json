@@ -19,7 +19,6 @@
   "default_raw_material_warehouse",
   "default_wip_warehouse",
   "column_break_converting",
-  "default_fg_warehouse",
   "section_corrugator_tolerance",
   "corrugator_tolerance",
   "section_converting_tolerance",
@@ -110,13 +109,6 @@
   {
    "fieldname": "column_break_converting",
    "fieldtype": "Column Break"
-  },
-  {
-   "default": "Finished Goods - IIB",
-   "fieldname": "default_fg_warehouse",
-   "fieldtype": "Link",
-   "label": "FG Warehouse",
-   "options": "Warehouse"
   },
   {
    "fieldname": "section_corrugator_tolerance",

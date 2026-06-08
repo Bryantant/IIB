@@ -370,12 +370,10 @@ class JobOrderConverting(Document):
 			self.master_card = parent
 
 	def set_warehouse_defaults(self):
-		"""Default WIP/FG warehouses from IIB Settings if not already set."""
+		"""Default WIP warehouse from IIB Settings if not already set."""
 		settings = frappe.get_cached_doc("IIB Settings")
 		if not self.wip_warehouse:
 			self.wip_warehouse = settings.default_wip_warehouse
-		if not self.fg_warehouse:
-			self.fg_warehouse = settings.default_fg_warehouse
 
 	def validate_so_items_match_production_item(self):
 		"""Every sales_order_items row must reference the same production_item."""
@@ -701,7 +699,7 @@ class JobOrderConverting(Document):
 	# ---- cancel guards ----
 
 	def guard_against_submitted_movement_docs(self):
-		"""Block cancel if any submitted RM to WIP or WIP to FG docs exist."""
+		"""Block cancel if any submitted RM to WIP docs exist."""
 		rm_to_wip = frappe.db.get_value(
 			"Job Order Converting RM to WIP",
 			{"job_order_converting": self.name, "docstatus": 1},
@@ -713,19 +711,6 @@ class JobOrderConverting(Document):
 					"Cannot cancel: submitted Job Order Converting RM to WIP {0} exists. "
 					"Cancel it first."
 				).format(frappe.bold(rm_to_wip))
-			)
-		wip_to_fg = frappe.db.get_all(
-			"Job Order Converting WIP to FG",
-			filters={"job_order_converting": self.name, "docstatus": 1},
-			fields=["name"],
-		)
-		if wip_to_fg:
-			names = [r.name for r in wip_to_fg]
-			frappe.throw(
-				_(
-					"Cannot cancel: submitted Job Order Converting WIP to FG exist: {0}. "
-					"Cancel them first."
-				).format(", ".join(names))
 			)
 
 	def cancel_draft_rm_to_wip(self):
@@ -790,7 +775,7 @@ class JobOrderConverting(Document):
 	# ---- Stock Entry rollup (called from Stock Entry submit/cancel hook) ----
 
 	def update_produced_qty(self):
-		"""Recompute produced_qty from submitted FGTS docs (primary) + legacy WIP to FG docs."""
+		"""Recompute produced_qty from submitted FGTS docs."""
 		# One FGTS = one transfer of `total_qty` finished goods for this JO, so sum
 		# the header qty once per FGTS. Do NOT join FGTS Item filtered by
 		# production_item: bundle FGTS track component rows whose item_code is not
@@ -804,18 +789,7 @@ class JobOrderConverting(Document):
 			""",
 			(self.name,),
 		)[0][0]
-		legacy_total = frappe.db.sql(
-			"""
-			SELECT IFNULL(SUM(i.qty), 0)
-			FROM `tabJob Order Converting WIP to FG Item` i
-			JOIN `tabJob Order Converting WIP to FG` p ON p.name = i.parent
-			WHERE p.job_order_converting = %s
-			  AND p.docstatus = 1
-			  AND i.item_code = %s
-			""",
-			(self.name, self.production_item),
-		)[0][0]
-		total = flt(fgts_total) + flt(legacy_total)
+		total = flt(fgts_total)
 		self.db_set("produced_qty", flt(total), update_modified=False)
 		jo_qty_in_process = max(flt(self.qty) - flt(total), 0)
 		self.db_set("jo_qty_in_process", jo_qty_in_process, update_modified=False)

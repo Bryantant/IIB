@@ -1,9 +1,19 @@
 frappe.ui.form.on("FGTS", {
 	setup(frm) {
 		frm.set_query("section", () => ({ filters: { is_group: 0 } }));
-		frm.set_query("sales_order", () => ({
-			filters: { docstatus: 1, status: ["not in", ["Closed", "Cancelled"]] },
-		}));
+		// Sales Order options are narrowed by the chosen Customer (pick customer first).
+		frm.set_query("sales_order", () => {
+			const filters = { docstatus: 1, status: ["not in", ["Closed", "Cancelled"]] };
+			if (frm.doc.customer) filters.customer = frm.doc.customer;
+			return { filters };
+		});
+	},
+
+	customer(frm) {
+		// Changing the customer invalidates the previously chosen SO and its components.
+		if (frm.doc.sales_order) {
+			frm.set_value("sales_order", "");
+		}
 	},
 
 	refresh(frm) {
@@ -31,12 +41,10 @@ frappe.ui.form.on("FGTS", {
 	},
 
 	sales_order(frm) {
-		// Clear all dependent data
+		// Clear component-dependent data (customer is chosen by the user, keep it)
 		frm.clear_table("items");
 		frm.refresh_field("items");
-		frm.set_value("customer", "");
 		frm.set_value("wip_warehouse", "");
-		frm.set_value("fg_warehouse", "");
 		frm.set_df_property("so_item_select", "options", "");
 		frm._so_item_options = [];
 
@@ -54,9 +62,7 @@ frappe.ui.form.on("FGTS", {
 				if (!r.message || !r.message.length) return;
 				frm._so_item_options = r.message;
 				const first = r.message[0];
-				if (first.customer)         frm.set_value("customer", first.customer);
 				if (first.wip_warehouse)    frm.set_value("wip_warehouse", first.wip_warehouse);
-				if (first.fg_warehouse)     frm.set_value("fg_warehouse", first.fg_warehouse);
 				if (first.stores_warehouse) frm.set_value("stores_warehouse", first.stores_warehouse);
 				_refresh_add_component_select(frm);
 			},
@@ -146,46 +152,24 @@ function _refresh_add_component_select(frm) {
 }
 
 function render_stock_ledger_btns(frm) {
-	frm.remove_custom_button(__("WIP to FG"), __("View"));
-	frm.remove_custom_button(__("FG to Stores"), __("View"));
+	frm.remove_custom_button(__("Stock Ledger"), __("View"));
 
-	if (frm.doc.docstatus !== 1) return;
+	// Stock moves (Source → Stores) only once QC is approved.
+	if (frm.doc.docstatus !== 1 || frm.doc.status !== "OK QC") return;
 
-	// Phase 1 button — visible once WIP→FG entries have been posted
-	if (frm.doc.wip_to_fg_done) {
-		frm.add_custom_button(
-			__("WIP to FG"),
-			() => {
-				frappe.route_options = {
-					voucher_no: frm.doc.name,
-					from_date: frm.doc.posting_date,
-					to_date: frm.doc.posting_date,
-					company: frm.doc.company,
-					warehouse: frm.doc.fg_warehouse,
-				};
-				frappe.set_route("query-report", "Stock Ledger");
-			},
-			__("View")
-		);
-	}
-
-	// Phase 2 button — visible once FG→Stores entries have been posted
-	if (frm.doc.fg_to_stores_done) {
-		frm.add_custom_button(
-			__("FG to Stores"),
-			() => {
-				frappe.route_options = {
-					voucher_no: frm.doc.name,
-					from_date: frm.doc.posting_date,
-					to_date: frm.doc.posting_date,
-					company: frm.doc.company,
-					warehouse: frm.doc.stores_warehouse,
-				};
-				frappe.set_route("query-report", "Stock Ledger");
-			},
-			__("View")
-		);
-	}
+	frm.add_custom_button(
+		__("Stock Ledger"),
+		() => {
+			frappe.route_options = {
+				voucher_no: frm.doc.name,
+				from_date: frm.doc.posting_date,
+				to_date: frm.doc.posting_date,
+				company: frm.doc.company,
+			};
+			frappe.set_route("query-report", "Stock Ledger");
+		},
+		__("View")
+	);
 }
 
 function render_approve_qc_btn(frm) {
@@ -196,7 +180,7 @@ function render_approve_qc_btn(frm) {
 		__("Approve QC"),
 		() => {
 			frappe.confirm(
-				__("Move stock from Finished Goods to Stores and mark as OK QC?"),
+				__("Move stock from WIP to Stores and mark as OK QC?"),
 				() => {
 					frappe.call({
 						method: "iib.iib.doctype.fgts.fgts.approve_qc",
@@ -234,7 +218,7 @@ function set_status_indicator(frm) {
 }
 
 /**
- * Populate warehouse quantities (rm_qty, wip_qty, fg_qty, stores_qty) for each item row.
+ * Populate warehouse quantities (rm_qty, wip_qty, stores_qty) for each item row.
  * Fetches current stock balances in a single batched call. Live stock is only
  * meaningful while drafting, so on submitted docs the saved snapshot is kept.
  * Values are assigned directly (not via set_value) so the form isn't marked dirty.
@@ -258,7 +242,7 @@ function _populate_warehouse_quantities(frm) {
 			rows.forEach((row) => {
 				const q = r.message[row.item_code];
 				if (!q) return;
-				["rm_qty", "wip_qty", "fg_qty", "stores_qty"].forEach((f) => {
+				["rm_qty", "wip_qty", "stores_qty"].forEach((f) => {
 					const val = flt(q[f] || 0);
 					if (flt(row[f]) !== val) {
 						row[f] = val;
