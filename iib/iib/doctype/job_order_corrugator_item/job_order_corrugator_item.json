@@ -1,0 +1,396 @@
+{
+ "actions": [],
+ "autoname": "autoincrement",
+ "creation": "2026-05-20 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_order",
+  "sales_order",
+  "sales_order_item",
+  "col_break_order",
+  "item_code",
+  "item_name",
+  "description",
+  "customer_part_no",
+  "sec_board_spec",
+  "quality",
+  "flute",
+  "width",
+  "length",
+  "col_break_board_spec",
+  "dc",
+  "single_double",
+  "set_pcs",
+  "uom",
+  "sec_crease_joints",
+  "crease_w",
+  "crease_l",
+  "slotting",
+  "col_break_crease_joints",
+  "display",
+  "joint_1",
+  "joint_2",
+  "sec_qty",
+  "qty",
+  "col_break_qty",
+  "received_qty",
+  "pending_qty",
+  "sec_machine_settings",
+  "running_width",
+  "running_length",
+  "col_break_machine",
+  "setting",
+  "cutting_number",
+  "sec_production",
+  "up_width",
+  "up_length",
+  "col_break_production",
+  "upw_upl",
+  "qty_production",
+  "sec_dates",
+  "due_date",
+  "delivery_date",
+  "so_date",
+  "col_break_dates",
+  "rate",
+  "customer"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_order",
+   "fieldtype": "Section Break",
+   "label": "Order"
+  },
+  {
+   "fieldname": "col_break_order",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.item_code",
+   "fieldname": "sec_board_spec",
+   "fieldtype": "Section Break",
+   "label": "Board Spec"
+  },
+  {
+   "fieldname": "col_break_board_spec",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sec_qty",
+   "fieldtype": "Section Break",
+   "label": "Qty"
+  },
+  {
+   "fieldname": "col_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.item_code",
+   "fieldname": "sec_crease_joints",
+   "fieldtype": "Section Break",
+   "label": "Crease & Joints"
+  },
+  {
+   "fetch_from": "item_code.custom_crease_w",
+   "fieldname": "crease_w",
+   "fieldtype": "Data",
+   "label": "Crease W",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_crease_l",
+   "fieldname": "crease_l",
+   "fieldtype": "Data",
+   "label": "Crease L",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_slotting",
+   "fieldname": "slotting",
+   "fieldtype": "Data",
+   "label": "Slotting",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_crease_joints",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "item_code.custom_display",
+   "fieldname": "display",
+   "fieldtype": "Check",
+   "label": "Display",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_joint_1",
+   "fieldname": "joint_1",
+   "fieldtype": "Select",
+   "label": "Joint 1",
+   "options": "\nGLUED\nSTITCHED\nHOT MELT\nTAPED\nFLAT\nRIVET",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_joint_2",
+   "fieldname": "joint_2",
+   "fieldtype": "Select",
+   "label": "Joint 2",
+   "options": "\nGLUED\nSTITCHED\nHOT MELT\nTAPED\nFLAT\nRIVET",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_machine_settings",
+   "fieldtype": "Section Break",
+   "label": "Machine Settings"
+  },
+  {
+   "fieldname": "running_width",
+   "fieldtype": "Float",
+   "label": "Running Width"
+  },
+  {
+   "fieldname": "running_length",
+   "fieldtype": "Float",
+   "label": "Running Length"
+  },
+  {
+   "fieldname": "col_break_machine",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "setting",
+   "fieldtype": "Float",
+   "label": "Setting"
+  },
+  {
+   "fieldname": "cutting_number",
+   "fieldtype": "Data",
+   "label": "Cutting Number"
+  },
+  {
+   "fieldname": "sec_production",
+   "fieldtype": "Section Break",
+   "label": "Production"
+  },
+  {
+   "fieldname": "col_break_production",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sec_dates",
+   "fieldtype": "Section Break",
+   "label": "Dates"
+  },
+  {
+   "fieldname": "col_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Data",
+   "label": "Sales Order Item",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.description",
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.stock_uom",
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty Req",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "received_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Received Qty",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "pending_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Pending Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "delivery_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Delivery Date",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "so_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "SO Date",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "JO Due Date"
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "Rate",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_part_no",
+   "fieldname": "customer_part_no",
+   "fieldtype": "Data",
+   "label": "Part No",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_flute",
+   "fieldname": "flute",
+   "fieldtype": "Link",
+   "label": "Flute",
+   "options": "Flute",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_board_quality",
+   "fieldname": "quality",
+   "fieldtype": "Link",
+   "label": "Quality",
+   "options": "Board Quality",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_width",
+   "fieldname": "width",
+   "fieldtype": "Int",
+   "label": "Width",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_length",
+   "fieldname": "length",
+   "fieldtype": "Int",
+   "label": "Length",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_dc",
+   "fieldname": "dc",
+   "fieldtype": "Int",
+   "label": "D/C",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_single_double",
+   "fieldname": "single_double",
+   "fieldtype": "Select",
+   "label": "Single/Double",
+   "options": "\nSingle A\nSingle B/C\nDouble BC\nDouble AB",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_set_pcs",
+   "fieldname": "set_pcs",
+   "fieldtype": "Float",
+   "label": "Set/Pcs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "up_width",
+   "fieldtype": "Float",
+   "label": "Up Width",
+   "read_only": 1
+  },
+  {
+   "fieldname": "up_length",
+   "fieldtype": "Float",
+   "label": "Up Length",
+   "read_only": 1
+  },
+  {
+   "fieldname": "upw_upl",
+   "fieldtype": "Float",
+   "label": "UpW UpL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty_production",
+   "fieldtype": "Float",
+   "label": "Qty",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-06 16:07:49.584512",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "Job Order Corrugator Item",
+ "naming_rule": "Autoincrement",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

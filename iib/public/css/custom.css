@@ -1,0 +1,45 @@
+/* Hide Help dropdown from navbar */
+button[aria-controls="toolbar-help"] {
+	display: none !important;
+}
+
+/* Checkbox checked state */
+input[type="checkbox"] {
+	accent-color: #5c38b4;
+}
+
+input[type="checkbox"]:checked {
+	background-color: #5c38b4 !important;
+	border-color: #5c38b4 !important;
+	background-image:
+		url("data:image/svg+xml, <svg viewBox='0 0 8 7' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M1 4.00001L2.66667 5.80001L7 1.20001' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>"),
+		linear-gradient(180deg, #5c38b4 -124.51%, #5c38b4 100%) !important;
+}
+
+/* Primary action buttons: Add Item, Save, Submit, Actions, Update */
+.btn.btn-primary,
+.btn.primary-action,
+.standard-actions .btn.btn-primary,
+.actions-btn-group .btn.btn-primary,
+.modal .btn.btn-primary,
+.btn.btn-modal-primary {
+	background: #5c38b4 !important;
+	border-color: #5c38b4 !important;
+	color: #ffffff !important;
+}
+
+.btn.btn-primary:hover,
+.btn.btn-primary:focus,
+.btn.primary-action:hover,
+.btn.primary-action:focus,
+.standard-actions .btn.btn-primary:hover,
+.standard-actions .btn.btn-primary:focus,
+.actions-btn-group .btn.btn-primary:hover,
+.actions-btn-group .btn.btn-primary:focus,
+.modal .btn.btn-primary:hover,
+.modal .btn.btn-primary:focus,
+.btn.btn-modal-primary:hover,
+.btn.btn-modal-primary:focus {
+	background: #4a2d9d !important;
+	border-color: #4a2d9d !important;
+}

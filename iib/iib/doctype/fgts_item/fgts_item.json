@@ -1,0 +1,110 @@
+{
+ "autoname": "hash",
+ "creation": "2026-05-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "item_name",
+  "master_card",
+  "component",
+  "sales_order_item",
+  "col_break_1",
+  "rm_qty",
+  "wip_qty",
+  "stores_qty",
+  "col_break_2",
+  "basic_rate"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "master_card",
+   "fieldtype": "Link",
+   "label": "MC No",
+   "options": "Master Card",
+   "read_only": 1
+  },
+  {
+   "fieldname": "component",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Component",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Link",
+   "label": "SO Item",
+   "options": "Sales Order Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "rm_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "RM Qty",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "wip_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "WIP Qty",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "stores_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Stores Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "basic_rate",
+   "fieldtype": "Currency",
+   "label": "Basic Rate"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "FGTS Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC"
+}

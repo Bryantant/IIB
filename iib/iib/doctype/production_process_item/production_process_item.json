@@ -1,0 +1,212 @@
+{
+ "actions": [],
+ "creation": "2026-05-25 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "job_order_converting",
+  "job_order_converting_operation",
+  "item_code",
+  "item_name",
+  "master_card",
+  "customer",
+  "so_no",
+  "so_qty",
+  "due_date",
+  "t_start",
+  "t_sett",
+  "t_stop",
+  "tot_s",
+  "tot_p",
+  "idle",
+  "p_qty",
+  "c_qty",
+  "rmr",
+  "sr",
+  "operators",
+  "remark",
+  "last_update",
+  "created_log"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "job_order_converting",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Job Order",
+   "options": "Job Order Converting",
+   "reqd": 1
+  },
+  {
+   "fieldname": "job_order_converting_operation",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "JO Operation Ref",
+   "no_copy": 1,
+   "options": "Job Order Converting Operation"
+  },
+  {
+   "columns": 1,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "master_card",
+   "fieldtype": "Link",
+   "label": "MC",
+   "options": "Master Card",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "so_no",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "so_qty",
+   "fieldtype": "Float",
+   "label": "JO Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "t_start",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "T Start"
+  },
+  {
+   "columns": 1,
+   "fieldname": "t_sett",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "T Sett"
+  },
+  {
+   "columns": 1,
+   "fieldname": "t_stop",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "T Stop"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "tot_s",
+   "fieldtype": "Float",
+   "label": "Tot S",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "tot_p",
+   "fieldtype": "Float",
+   "label": "Tot P",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "idle",
+   "fieldtype": "Float",
+   "label": "Idle"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "p_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "P Qty"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "c_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "C Qty"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "rmr",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "RMR"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "sr",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "SR"
+  },
+  {
+   "fieldname": "operators",
+   "fieldtype": "Data",
+   "label": "Operators"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Data",
+   "label": "Remark"
+  },
+  {
+   "fieldname": "last_update",
+   "fieldtype": "Data",
+   "label": "Last Update",
+   "read_only": 1
+  },
+  {
+   "fieldname": "created_log",
+   "fieldtype": "Data",
+   "label": "Created",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-30 22:55:38.455582",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "Production Process Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

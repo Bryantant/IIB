@@ -1,0 +1,272 @@
+{
+ "actions": [],
+ "creation": "2026-06-03 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_sales",
+  "so_batch_current_period",
+  "so_batch_next_number",
+  "col_break_1",
+  "sales_order_current_period",
+  "sales_order_next_number",
+  "section_delivery_purchase",
+  "delivery_note_current_period",
+  "delivery_note_next_number",
+  "col_break_2",
+  "purchase_order_current_period",
+  "purchase_order_next_number",
+  "section_jop",
+  "jop1_current_period",
+  "jop1_next_number",
+  "col_break_3",
+  "jop1r_current_period",
+  "jop1r_next_number",
+  "section_jop2",
+  "jop2_current_period",
+  "jop2_next_number",
+  "section_production",
+  "dps_current_period",
+  "dps_next_number",
+  "col_break_4",
+  "pp_current_period",
+  "pp_next_number",
+  "section_fgts",
+  "fgts_current_period",
+  "fgts_next_number",
+  "section_master_card",
+  "master_card_next_number"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_sales",
+   "fieldtype": "Section Break",
+   "label": "Sales Documents"
+  },
+  {
+   "fieldname": "so_batch_current_period",
+   "fieldtype": "Data",
+   "label": "SO Batch Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "so_batch_next_number",
+   "fieldtype": "Int",
+   "label": "SO Batch Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_order_current_period",
+   "fieldtype": "Data",
+   "label": "Sales Order Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "sales_order_next_number",
+   "fieldtype": "Int",
+   "label": "Sales Order Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_delivery_purchase",
+   "fieldtype": "Section Break",
+   "label": "Delivery & Purchase"
+  },
+  {
+   "fieldname": "delivery_note_current_period",
+   "fieldtype": "Data",
+   "label": "Delivery Note Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "delivery_note_next_number",
+   "fieldtype": "Int",
+   "label": "Delivery Note Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "purchase_order_current_period",
+   "fieldtype": "Data",
+   "label": "Purchase Order Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "purchase_order_next_number",
+   "fieldtype": "Int",
+   "label": "Purchase Order Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_jop",
+   "fieldtype": "Section Break",
+   "label": "Job Orders (Corrugator)"
+  },
+  {
+   "fieldname": "jop1_current_period",
+   "fieldtype": "Data",
+   "label": "JOP1 Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "jop1_next_number",
+   "fieldtype": "Int",
+   "label": "JOP1 Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "jop1r_current_period",
+   "fieldtype": "Data",
+   "label": "JOP1R Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "jop1r_next_number",
+   "fieldtype": "Int",
+   "label": "JOP1R Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_jop2",
+   "fieldtype": "Section Break",
+   "label": "Job Order Converting"
+  },
+  {
+   "fieldname": "jop2_current_period",
+   "fieldtype": "Data",
+   "label": "JOP2 Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "jop2_next_number",
+   "fieldtype": "Int",
+   "label": "JOP2 Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_production",
+   "fieldtype": "Section Break",
+   "label": "Production"
+  },
+  {
+   "fieldname": "dps_current_period",
+   "fieldtype": "Data",
+   "label": "DPS Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "dps_next_number",
+   "fieldtype": "Int",
+   "label": "DPS Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pp_current_period",
+   "fieldtype": "Data",
+   "label": "Production Process Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "pp_next_number",
+   "fieldtype": "Int",
+   "label": "Production Process Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_fgts",
+   "fieldtype": "Section Break",
+   "label": "FGTS"
+  },
+  {
+   "fieldname": "fgts_current_period",
+   "fieldtype": "Data",
+   "label": "FGTS Current Period",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "fgts_next_number",
+   "fieldtype": "Int",
+   "label": "FGTS Next No",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_master_card",
+   "fieldtype": "Section Break",
+   "label": "Master Card"
+  },
+  {
+   "default": "1",
+   "fieldname": "master_card_next_number",
+   "fieldtype": "Int",
+   "label": "Master Card Next Number",
+   "non_negative": 1,
+   "reqd": 1
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-03 00:00:00",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "IIB Document Naming Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "IIB Manufacturing Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

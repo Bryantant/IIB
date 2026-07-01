@@ -1,0 +1,162 @@
+{
+ "actions": [],
+ "creation": "2026-05-25 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "job_order_converting",
+  "item_code",
+  "item_name",
+  "master_card",
+  "customer",
+  "flute",
+  "colours",
+  "so_no",
+  "so_qty",
+  "due_date",
+  "req_qty",
+  "proc_qty",
+  "run_qty",
+  "waktu",
+  "remark",
+  "last_update"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "job_order_converting",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Job Order",
+   "options": "Job Order Converting",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "master_card",
+   "fieldtype": "Link",
+   "label": "MC",
+   "options": "Master Card",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "flute",
+   "fieldtype": "Link",
+   "label": "Flute",
+   "options": "Flute",
+   "read_only": 1
+  },
+  {
+   "fieldname": "colours",
+   "fieldtype": "Data",
+   "label": "Colours",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "so_no",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "so_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "JO Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "req_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Req Qty"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "proc_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Proc Qty"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "run_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Run Qty"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "waktu",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Waktu"
+  },
+  {
+   "columns": 1,
+   "fieldname": "remark",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Remark"
+  },
+  {
+   "fieldname": "last_update",
+   "fieldtype": "Data",
+   "label": "Last Update",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-07 17:07:28.091447",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "Daily Production Schedule Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,381 @@
+{
+ "actions": [],
+ "creation": "2026-05-18 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_identification",
+  "component",
+  "item_description",
+  "col_break_ident",
+  "item_code",
+  "custom_part_no",
+  "sec_printing",
+  "custom_printing",
+  "custom_assembly",
+  "col_break_colours_1",
+  "custom_colour_1",
+  "custom_colour_2",
+  "custom_colour_3",
+  "col_break_colours_2",
+  "custom_colour_4",
+  "custom_colour_5",
+  "custom_finishing",
+  "sec_qty_dims",
+  "qty",
+  "uom",
+  "col_break_qty",
+  "custom_inside_measure_l",
+  "custom_inside_measure_w",
+  "custom_inside_measure_h",
+  "sec_outer_dims",
+  "custom_width",
+  "custom_length",
+  "custom_dc",
+  "col_break_outer",
+  "custom_single_double",
+  "custom_board_quality",
+  "custom_flute",
+  "sec_crease_joints",
+  "custom_crease_w",
+  "custom_crease_l",
+  "custom_slotting",
+  "col_break_joints",
+  "custom_display",
+  "custom_joint_1",
+  "custom_joint_2",
+  "sec_remarks",
+  "custom_remarks",
+  "sec_misc",
+  "custom_weight",
+  "col_break_misc",
+  "custom_pic",
+  "item_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_identification",
+   "fieldtype": "Section Break",
+   "label": "Identification"
+  },
+  {
+   "columns": 1,
+   "fieldname": "component",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Comp",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "item_description",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Description",
+   "options": "Item Description",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_ident",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "label": "Item",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "custom_part_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Part No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_printing",
+   "fieldtype": "Section Break",
+   "label": "Printing & Colours"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "custom_printing",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Printing"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "custom_assembly",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Assembly"
+  },
+  {
+   "fieldname": "col_break_colours_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.custom_printing",
+   "fieldname": "custom_colour_1",
+   "fieldtype": "Link",
+   "label": "Colour 1",
+   "options": "Colour",
+   "read_only_depends_on": "eval:!doc.custom_printing"
+  },
+  {
+   "depends_on": "eval:doc.custom_printing",
+   "fieldname": "custom_colour_2",
+   "fieldtype": "Link",
+   "label": "Colour 2",
+   "options": "Colour",
+   "read_only_depends_on": "eval:!doc.custom_printing"
+  },
+  {
+   "depends_on": "eval:doc.custom_printing",
+   "fieldname": "custom_colour_3",
+   "fieldtype": "Link",
+   "label": "Colour 3",
+   "options": "Colour",
+   "read_only_depends_on": "eval:!doc.custom_printing"
+  },
+  {
+   "fieldname": "col_break_colours_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.custom_printing",
+   "fieldname": "custom_colour_4",
+   "fieldtype": "Link",
+   "label": "Colour 4",
+   "options": "Colour",
+   "read_only_depends_on": "eval:!doc.custom_printing"
+  },
+  {
+   "depends_on": "eval:doc.custom_printing",
+   "fieldname": "custom_colour_5",
+   "fieldtype": "Link",
+   "label": "Colour 5",
+   "options": "Colour",
+   "read_only_depends_on": "eval:!doc.custom_printing"
+  },
+  {
+   "depends_on": "eval:doc.custom_printing",
+   "fieldname": "custom_finishing",
+   "fieldtype": "Data",
+   "label": "Finishing",
+   "read_only_depends_on": "eval:!doc.custom_printing"
+  },
+  {
+   "fieldname": "sec_qty_dims",
+   "fieldtype": "Section Break",
+   "label": "Qty & Inside Dimensions"
+  },
+  {
+   "columns": 1,
+   "default": "1",
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_inside_measure_l",
+   "fieldtype": "Int",
+   "label": "IS.L"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_inside_measure_w",
+   "fieldtype": "Int",
+   "label": "IS.W"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_inside_measure_h",
+   "fieldtype": "Int",
+   "label": "IS.H"
+  },
+  {
+   "fieldname": "sec_outer_dims",
+   "fieldtype": "Section Break",
+   "label": "Outer Dimensions & Board"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_width",
+   "fieldtype": "Int",
+   "label": "Width"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_length",
+   "fieldtype": "Int",
+   "label": "Length"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_dc",
+   "fieldtype": "Int",
+   "label": "D/C"
+  },
+  {
+   "fieldname": "col_break_outer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_single_double",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Single/Double",
+   "options": "\nSingle A\nSingle B/C\nDouble BC\nDouble AB"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_board_quality",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Board Quality",
+   "options": "Board Quality"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_flute",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Flute",
+   "options": "Flute"
+  },
+  {
+   "fieldname": "sec_crease_joints",
+   "fieldtype": "Section Break",
+   "label": "Crease & Joints"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_crease_w",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Crease W"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_crease_l",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Crease L"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_slotting",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Slotting"
+  },
+  {
+   "fieldname": "col_break_joints",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "custom_display",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Display"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_joint_1",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Joint 1",
+   "options": "\nGLUED\nSTITCHED\nHOT MELT\nTAPED\nFLAT\nRIVET"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_joint_2",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Joint 2",
+   "options": "\nGLUED\nSTITCHED\nHOT MELT\nTAPED\nFLAT\nRIVET"
+  },
+  {
+   "fieldname": "sec_remarks",
+   "fieldtype": "Section Break",
+   "label": "Remarks"
+  },
+  {
+   "bold": 1,
+   "columns": 2,
+   "fieldname": "custom_remarks",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "sec_misc",
+   "fieldtype": "Section Break",
+   "label": "Other"
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_weight",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Weight"
+  },
+  {
+   "fieldname": "col_break_misc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "UOM",
+   "options": "UOM",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "custom_pic",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "PIC",
+   "options": "MC PIC"
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Item Name",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-05 15:42:08.315284",
+ "modified_by": "Administrator",
+ "module": "IIB",
+ "name": "Master Card Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
