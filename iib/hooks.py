@@ -39,5 +39,6 @@ fixtures = [
 	{"dt": "Client Script", "filters": [["module", "=", "IIB"]]},
 	{"dt": "Server Script", "filters": [["module", "=", "IIB"]]},
 	{"dt": "Item Group", "filters": [["name", "in", ["Master Card", "Sub Assemblies", "Component"]]]},
+	{"dt": "Warehouse", "filters": [["company", "=", "PT. Interpak Industries Batam"]]},
 	"Translation",
 ]
