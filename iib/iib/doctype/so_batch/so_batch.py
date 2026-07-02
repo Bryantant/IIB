@@ -371,6 +371,17 @@ def get_master_card_components_by_item(master_card):
 
 
 def get_master_card_price_map(master_card, qty, row_idx):
+    moq_rows = frappe.get_all(
+        "Master Card MOQ",
+        filters={
+            "parent": master_card,
+            "parentfield": "moq_items",
+            "parenttype": "Master Card",
+        },
+        fields=["idx", "moq_qty"],
+    )
+    moq_qty_by_idx = {row.idx: flt(row.moq_qty) for row in moq_rows}
+
     rows = frappe.get_all(
         "Master Card Price Item",
         filters={
@@ -378,9 +389,13 @@ def get_master_card_price_map(master_card, qty, row_idx):
             "parentfield": "price_items",
             "parenttype": "Master Card",
         },
-        fields=["moq_qty", "component", "total"],
-        order_by="moq_qty desc, component asc",
+        fields=["moq_idx", "component", "total"],
     )
+    for row in rows:
+        row.moq_qty = moq_qty_by_idx.get(row.moq_idx)
+    rows = [row for row in rows if row.moq_qty is not None]
+    rows.sort(key=lambda row: (-flt(row.moq_qty), row.component or ""))
+
     eligible = [row for row in rows if flt(row.moq_qty) <= flt(qty)]
     if not eligible:
         frappe.throw(

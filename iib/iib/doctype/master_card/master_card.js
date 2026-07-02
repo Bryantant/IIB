@@ -430,7 +430,7 @@ function render_price_items_editor(frm) {
 	// MOQ qty change
 	$w.find(".mc-moq-input").on("change", function () {
 		const moqName = $(this).data("moq-name");
-		const newQty = flt($(this).val());
+		const newQty = parseFloat($(this).val()) || 0;
 		frappe.model.set_value("Master Card MOQ", moqName, "moq_qty", newQty);
 		frm.dirty();
 	});
@@ -462,7 +462,10 @@ function render_price_items_editor(frm) {
 			$(this).val(value);
 			frappe.model.set_value("Master Card Price Item", rowName, "component", value);
 		} else {
-			value = flt(value);
+			// this input is a native <input type="number">, whose .val() is always
+			// dot-decimal per the HTML5 spec — flt() would misparse it here because
+			// this site's Number Format ("#.###,##") treats "." as a thousands separator
+			value = parseFloat(value) || 0;
 			frappe.model.set_value("Master Card Price Item", rowName, fieldname, value).then(() => {
 				const row = locals["Master Card Price Item"] && locals["Master Card Price Item"][rowName];
 				if (!row) return;
