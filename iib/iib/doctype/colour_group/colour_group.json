@@ -1,36 +1,30 @@
 {
  "actions": [],
- "autoname": "field:colour_name",
- "creation": "2026-05-28 00:00:00",
+ "allow_rename": 1,
+ "autoname": "field:colour_group",
+ "creation": "2026-07-30 00:00:00.000000",
  "doctype": "DocType",
+ "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "colour_name",
   "colour_group"
  ],
  "fields": [
   {
-   "fieldname": "colour_name",
+   "fieldname": "colour_group",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Colour Name",
+   "label": "Colour Group",
    "reqd": 1,
    "unique": 1
-  },
-  {
-   "fieldname": "colour_group",
-   "fieldtype": "Table MultiSelect",
-   "in_list_view": 1,
-   "label": "Colour Group",
-   "options": "Colour Colour Group"
   }
  ],
- "index_web_pages_for_search": 0,
+ "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-28 00:00:00.000000",
+ "modified": "2026-07-30 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "IIB",
- "name": "Colour",
+ "name": "Colour Group",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
@@ -76,7 +70,9 @@
   }
  ],
  "row_format": "Dynamic",
- "sort_field": "colour_name",
+ "sort_field": "colour_group",
  "sort_order": "ASC",
- "states": []
+ "states": [],
+ "title_field": "colour_group",
+ "track_changes": 1
 }

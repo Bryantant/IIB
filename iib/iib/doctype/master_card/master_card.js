@@ -186,10 +186,82 @@ frappe.ui.form.on("Master Card Item", {
 		}
 	},
 
+	item_description(frm, cdt, cdn) {
+		recalc_box_dimensions(frm, cdt, cdn);
+	},
+
+	custom_inside_measure_l(frm, cdt, cdn) {
+		recalc_box_dimensions(frm, cdt, cdn);
+	},
+
+	custom_inside_measure_w(frm, cdt, cdn) {
+		recalc_box_dimensions(frm, cdt, cdn);
+	},
+
+	custom_inside_measure_h(frm, cdt, cdn) {
+		recalc_box_dimensions(frm, cdt, cdn);
+	},
+
+	custom_single_double(frm, cdt, cdn) {
+		recalc_box_dimensions(frm, cdt, cdn);
+	},
+
 	items_remove(frm) {
 		frm.trigger("render_process_tabs");
 	},
 });
+
+// ------------------------------------------------------------------
+// Box dimension calculation — ported from legacy Access form
+// FmMasterCardDt.SingDoub_AfterUpdate(). Gate was PartNo.Flag there;
+// in this system that gate is Item Description.calculation.
+// ------------------------------------------------------------------
+
+const BOX_DIM_CONSTANTS = {
+	"Single A": (L, W, H) => ({
+		vl1: 32, vl2: L + 5, vl3: W + 5, vl4: L + 5, vl5: W + 3,
+		vw1: Math.floor(W / 2) + 5, vw2: H + 12, vw3: Math.floor(W / 2) + 5,
+	}),
+	"Single B/C": (L, W, H) => ({
+		vl1: 32, vl2: L + 3, vl3: W + 3, vl4: L + 3, vl5: W + 2,
+		vw1: Math.floor(W / 2) + 3, vw2: H + 7, vw3: Math.floor(W / 2) + 3,
+	}),
+	"Double BC": (L, W, H) => ({
+		vl1: 38, vl2: L + 6, vl3: W + 6, vl4: L + 6, vl5: W + 3,
+		vw1: Math.floor(W / 2) + 6, vw2: H + 13, vw3: Math.floor(W / 2) + 6,
+	}),
+	"Double AB": (L, W, H) => ({
+		vl1: 38, vl2: L + 7, vl3: W + 7, vl4: L + 7, vl5: W + 4,
+		vw1: Math.floor(W / 2) + 7, vw2: H + 16, vw3: Math.floor(W / 2) + 7,
+	}),
+};
+
+function recalc_box_dimensions(frm, cdt, cdn) {
+	const row = locals[cdt][cdn];
+	if (!row) return;
+
+	const { custom_inside_measure_l: L, custom_inside_measure_w: W, custom_inside_measure_h: H } = row;
+	if (!row.item_description || !row.custom_single_double) return;
+	if (!L || !W || !H) return;
+
+	const build = BOX_DIM_CONSTANTS[row.custom_single_double];
+	if (!build) return;
+
+	frappe.db.get_value("Item Description", row.item_description, "calculation").then((r) => {
+		if (!r.message || !r.message.calculation) return;
+
+		const c = build(L, W, H);
+		const length = c.vl1 + c.vl2 + c.vl3 + c.vl4 + c.vl5 + 10;
+		const width = c.vw1 + c.vw2 + c.vw3;
+
+		frappe.model.set_value(cdt, cdn, {
+			custom_length: length,
+			custom_width: width,
+			custom_crease_l: `${c.vl1}:${c.vl2}:${c.vl3}:${c.vl4}:${c.vl5}=${length - 10}`,
+			custom_crease_w: `${c.vw1}:${c.vw2}:${c.vw3}=${width}`,
+		});
+	});
+}
 
 // Master Card Price Item events are handled by the HTML widget inputs directly.
 
@@ -266,7 +338,7 @@ function set_process_queries(frm) {
 function set_colour_queries(frm) {
 	[1, 2, 3, 4, 5].forEach((i) => {
 		frm.set_query(`custom_colour_${i}`, "items", () => ({
-			filters: { colour_group: `Colour ${i}` },
+			filters: [["Colour Colour Group", "colour_group", "=", `Colour ${i}`]],
 		}));
 	});
 }
@@ -314,7 +386,7 @@ function render_price_items_editor(frm) {
 		const $table = $(`
 			<table class="table table-bordered table-condensed mc-price-table" style="margin-bottom:8px">
 				<thead><tr>
-					<th style="min-width:130px"></th>
+					<th style="min-width:160px"></th>
 					<th style="width:54px">${__("Comp")}</th>
 					<th class="text-right">${__("Material")}</th>
 					<th class="text-right">${__("Labour")}</th>
@@ -344,7 +416,7 @@ function render_price_items_editor(frm) {
 					<input type="number" step="any" value="${flt(moqRow.moq_qty)}"
 						class="mc-moq-input"
 						data-moq-name="${moqRow.name}"
-						style="width:64px;padding:2px 4px;border:1px solid var(--border-color);border-radius:var(--border-radius-sm);text-align:right;font-size:var(--text-sm);">
+						style="width:94px;padding:2px 4px;border:1px solid var(--border-color);border-radius:var(--border-radius-sm);text-align:right;font-size:var(--text-sm);">
 				</div>
 				<button class="btn btn-xs" style="color:var(--red-500);padding:0 4px;line-height:1.4;font-size:10px;" data-del-moq="${moqRow.name}" title="${__("Remove MOQ level")}">✕ ${__("Remove")}</button>
 			</td>`);

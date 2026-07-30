@@ -79,7 +79,7 @@ class MasterCard(Document):
 			)
 
 		if not self.mc_fg_item_group:
-			self.mc_fg_item_group = getattr(settings, "mc_fg_item_group", None) or "Sub Assemblies"
+			self.mc_fg_item_group = getattr(settings, "mc_fg_item_group", None) or "Component"
 
 		if not self.component_item_group:
 			self.component_item_group = (
@@ -230,6 +230,7 @@ class MasterCard(Document):
 
 	def _sync_fg_items(self):
 		customer = self.customer or None
+		desc_text_map = self._get_item_description_text_map()
 
 		for row in self.items:
 			if not row.component:
@@ -238,15 +239,16 @@ class MasterCard(Document):
 			letter = row.component.upper()
 			row.component = letter
 			row.item_code = self.name + letter
-			row.item_name = row.item_description or row.item_code
+			desc_text = desc_text_map.get(row.item_description)
+			row.item_name = desc_text or row.item_code
 
 			spec = {f: row.get(f) for f in ITEM_SPEC_FIELDS}
 			spec["custom_set_pcs"] = row.qty
 
 			if frappe.db.exists("Item", row.item_code):
 				updates = {f: v for f, v in spec.items() if v is not None}
-				if row.item_description:
-					updates["item_name"] = row.item_description
+				if desc_text:
+					updates["item_name"] = desc_text
 				if row.uom:
 					updates["stock_uom"] = row.uom
 					self._ensure_item_uom(row.item_code, row.uom)
@@ -257,7 +259,7 @@ class MasterCard(Document):
 					{
 						"doctype": "Item",
 						"item_code": row.item_code,
-						"item_name": row.item_description or row.item_code,
+						"item_name": desc_text or row.item_code,
 						"item_group": self.mc_fg_item_group,
 						"stock_uom": row.uom or self.default_uom or "Nos",
 						"is_stock_item": 1,
@@ -269,6 +271,20 @@ class MasterCard(Document):
 					if value:
 						item_doc.set(field, value)
 				item_doc.insert(ignore_permissions=True)
+
+	def _get_item_description_text_map(self):
+		"""Map Item Description docnames (as stored on Master Card Item rows) to their display text."""
+		desc_ids = {row.item_description for row in self.items if row.item_description}
+		if not desc_ids:
+			return {}
+		return dict(
+			frappe.get_all(
+				"Item Description",
+				filters={"name": ["in", list(desc_ids)]},
+				fields=["name", "item_description"],
+				as_list=True,
+			)
+		)
 
 	def _ensure_item_uom(self, item_code, uom):
 		"""Insert a UOM Conversion Detail row for this UOM if one doesn't already exist."""
@@ -302,6 +318,8 @@ class MasterCard(Document):
 			pb.new_item_code = self.item_code
 			pb.description = self.description or ""
 
+		desc_text_map = self._get_item_description_text_map()
+
 		for row in self.items:
 			if row.item_code:
 				pb.append(
@@ -309,7 +327,7 @@ class MasterCard(Document):
 					{
 						"item_code": row.item_code,
 						"qty": row.qty or 1,
-						"description": row.item_description or "",
+						"description": desc_text_map.get(row.item_description) or "",
 						"uom": row.uom or self.default_uom or "Nos",
 					},
 				)

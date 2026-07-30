@@ -24,6 +24,12 @@ doc_events = {
 	"Purchase Order": {
 		"autoname": "iib.overrides.purchase_order.autoname",
 	},
+	"Customer": {
+		"autoname": "iib.overrides.customer.autoname",
+	},
+	"Supplier": {
+		"autoname": "iib.overrides.supplier.autoname",
+	},
 }
 
 override_doctype_dashboards = {
@@ -38,7 +44,7 @@ fixtures = [
 	{"dt": "Property Setter", "filters": [["module", "=", "IIB"]]},
 	{"dt": "Client Script", "filters": [["module", "=", "IIB"]]},
 	{"dt": "Server Script", "filters": [["module", "=", "IIB"]]},
-	{"dt": "Item Group", "filters": [["name", "in", ["Master Card", "Sub Assemblies", "Component"]]]},
+	{"dt": "Item Group", "filters": [["name", "in", ["Master Card", "Component"]]]},
 	{"dt": "Warehouse", "filters": [["company", "=", "PT. Interpak Industries Batam"]]},
 	"Translation",
 ]
