@@ -10,6 +10,8 @@
   "item_code",
   "customer",
   "description",
+  "custom_manufacturing_joint_1",
+  "custom_manufacturing_joint_2",
   "disabled",
   "col_break_header",
   "remark",
@@ -69,6 +71,18 @@
    "in_list_view": 1,
    "label": "Description",
    "reqd": 1
+  },
+  {
+   "fieldname": "custom_manufacturing_joint_1",
+   "fieldtype": "Select",
+   "label": "Manufacturing Joint 1",
+   "options": "\nGLUED\nSTITCHED\nHOT MELT\nTAPED\nFLAT\nRIVET"
+  },
+  {
+   "fieldname": "custom_manufacturing_joint_2",
+   "fieldtype": "Select",
+   "label": "Manufacturing Joint 2",
+   "options": "\nGLUED\nSTITCHED\nHOT MELT\nTAPED\nFLAT\nRIVET"
   },
   {
    "default": "0",
