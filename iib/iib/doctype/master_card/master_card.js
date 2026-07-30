@@ -282,8 +282,15 @@ function calculate_price_rows(frm) {
 function calculate_price_row(frm, cdt, cdn, rerender = true) {
 	const row = locals[cdt] && locals[cdt][cdn];
 	if (!row) return;
-	const total = flt(row.material) + flt(row.labour) + flt(row.profit) + flt(row.ext_profit);
-	frappe.model.set_value(cdt, cdn, "total", total);
+	// Round to the field's own precision before comparing/writing — raw JS float
+	// arithmetic (e.g. 0.1+0.05+0.02+0 = 0.17520000000000002) essentially never
+	// matches a value round-tripped through the DB, so an unconditional set_value
+	// here marks every Master Card dirty on every page load, not just on edits.
+	const p = precision("total", row);
+	const total = flt(flt(row.material) + flt(row.labour) + flt(row.profit) + flt(row.ext_profit), p);
+	if (flt(row.total, p) !== total) {
+		frappe.model.set_value(cdt, cdn, "total", total);
+	}
 	if (rerender) render_price_items_editor(frm);
 }
 
