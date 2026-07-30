@@ -37,14 +37,3 @@ override_doctype_dashboards = {
 }
 
 company_data_to_be_ignored = ["Master Card"]
-
-fixtures = [
-	{"dt": "Role", "filters": [["name", "in", ["IIB Manufacturing Manager"]]]},
-	{"dt": "Custom Field", "filters": [["module", "=", "IIB"]]},
-	{"dt": "Property Setter", "filters": [["module", "=", "IIB"]]},
-	{"dt": "Client Script", "filters": [["module", "=", "IIB"]]},
-	{"dt": "Server Script", "filters": [["module", "=", "IIB"]]},
-	{"dt": "Item Group", "filters": [["name", "in", ["Master Card", "Component"]]]},
-	{"dt": "Warehouse", "filters": [["company", "=", "PT. Interpak Industries Batam"]]},
-	"Translation",
-]
