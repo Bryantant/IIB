@@ -15,7 +15,11 @@ extend_bootinfo = "iib.boot.boot_session"
 doc_events = {
 	"Delivery Note": {
 		"before_save": "iib.iib.doctype.so_batch.so_batch.set_dn_po_line_no",
+		"validate": "iib.iib.doctype.so_batch.so_batch.block_fc_sales_orders",
 		"autoname": "iib.overrides.delivery_note.autoname",
+	},
+	"Sales Invoice": {
+		"validate": "iib.iib.doctype.so_batch.so_batch.block_fc_sales_orders",
 	},
 	"Sales Order": {
 		"autoname": "iib.overrides.sales_order.autoname",

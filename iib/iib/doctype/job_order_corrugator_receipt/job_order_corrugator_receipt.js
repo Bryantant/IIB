@@ -4,18 +4,46 @@
 frappe.ui.form.on("Job Order Corrugator Receipt", {
 	setup(frm) {
 		set_account_queries(frm);
+		// Only JO Corrugators still open for receiving — mirrors the picker dialog's filter.
+		frm.set_query("job_order_corrugator", "items", () => ({
+			filters: {
+				docstatus: 1,
+				status: ["not in", ["Completed", "Closed", "Cancelled"]],
+			},
+		}));
 	},
 	refresh(frm) {
 		set_account_queries(frm);
 		set_status_indicator(frm);
 		add_get_items_button(frm);
 		add_view_buttons(frm);
+		frm.trigger("set_posting_date_and_time_read_only");
+	},
+	set_posting_time(frm) {
+		frm.trigger("set_posting_date_and_time_read_only");
+	},
+	set_posting_date_and_time_read_only(frm) {
+		// Mirrors erpnext.stock.StockController.setup_posting_date_time_check()
+		// (used by Sales Invoice, Purchase Invoice, Delivery Note, etc.): lock
+		// Posting Date/Time unless "Edit Posting Date and Time" is checked.
+		const editable = frm.doc.docstatus === 0 && frm.doc.set_posting_time;
+		frm.set_df_property("posting_date", "read_only", editable ? 0 : 1);
+		frm.set_df_property("posting_time", "read_only", editable ? 0 : 1);
 	},
 	onload_post_render(frm) {
-		// Filter item_code to stock items in the Component item group
-		frm.set_query("item_code", "items", () => ({
-			filters: { is_stock_item: 1, item_group: "Component" },
-		}));
+		// Filter item_code to Component items with pending qty on the row's JO
+		// Corrugator (bundles are not a concern here — JO Corrugator rows are
+		// already resolved to Component items). No JO Corrugator set yet on
+		// that row → no options at all (get_corrugator_component_items returns
+		// [] in that case); Item Code must not be pickable before JO No is.
+		frm.set_query("item_code", "items", (doc, cdt, cdn) => {
+			const row = locals[cdt][cdn];
+			return {
+				query:
+					"iib.iib.doctype.job_order_corrugator_receipt.job_order_corrugator_receipt.get_corrugator_component_items",
+				filters: { job_order_corrugator: row.job_order_corrugator },
+			};
+		});
 	},
 	company(frm) {
 		set_account_queries(frm);
@@ -162,15 +190,46 @@ function open_corrugator_selector(frm) {
 		].map((name) => ({ name, editable: false }));
 	};
 
-	patch_dialog_filter_refresh(picker);
-
-	// Default the "Select Job Order Corrugator Item" checkbox to checked
-	setTimeout(() => {
-		if (picker.dialog?.fields_dict?.allow_child_item_selection) {
-			picker.dialog.set_value("allow_child_item_selection", 1);
-			picker.toggle_child_selection?.();
+	// picker.dialog only exists once MultiSelectDialog's internal with_doctype() gate
+	// resolves — synchronously if "Job Order Corrugator" meta is already cached in this
+	// tab, otherwise only after an async round-trip to the server. Poll briefly instead
+	// of assuming either case.
+	let ready_check_attempts = 0;
+	const when_dialog_ready = () => {
+		if (!picker.dialog?.fields_dict) {
+			if (++ready_check_attempts > 40) return; // ~2s cap; give up quietly
+			setTimeout(when_dialog_ready, 50);
+			return;
 		}
-	}, 0);
+
+		patch_dialog_filter_refresh(picker);
+
+		if (!picker.dialog.fields_dict.allow_child_item_selection) return;
+
+		// Wait for the modal's own "shown" transition to finish before toggling the
+		// child-selection checkbox. Checking it immediately builds the child items
+		// frappe.DataTable while the modal is still mid fade-in (effectively hidden),
+		// and frappe.DataTable's column-width setup (it injects a CSS rule into a
+		// <style> tag sized off the container) throws "Cannot read properties of null
+		// (reading 'insertRule')" in that state, leaving the child table stuck on its
+		// loading skeleton with the parent list still visible underneath it. A normal
+		// user click never hits this because it always happens well after the modal
+		// has finished showing.
+		picker.dialog.$wrapper.one("shown.bs.modal", () => {
+			// Default the "Select Job Order Corrugator Item" checkbox to checked.
+			// set_value() already triggers the checkbox's own onchange handler
+			// (toggle_child_selection) — calling toggle_child_selection() again here
+			// would double-fire it and race two concurrent child-item fetches.
+			picker.dialog.set_value("allow_child_item_selection", 1);
+		});
+		// The dialog may already be fully shown by the time we get here (e.g. meta
+		// was cached and the transition already completed) — the "shown.bs.modal"
+		// event won't fire again in that case, so check display state directly too.
+		if (picker.dialog.display) {
+			picker.dialog.set_value("allow_child_item_selection", 1);
+		}
+	};
+	when_dialog_ready();
 }
 
 /**
@@ -209,6 +268,11 @@ function open_receipt_item_picker(frm, job_order_corrugators, filtered_children)
 				row.item_code         = item.item_code;
 				row.item_name         = item.item_name || "";
 				row.description       = item.description || "";
+				row.quality           = item.quality || "";
+				row.flute             = item.flute || "";
+				row.width             = item.width || 0;
+				row.length            = item.length || 0;
+				row.creasing          = item.crease_w || "";
 				row.sales_order       = item.sales_order || "";
 				row.uom               = item.uom;
 				row.qty               = item.pending_qty;
@@ -256,9 +320,43 @@ function patch_dialog_filter_refresh(dialog_obj) {
 	}
 }
 
-// Row-level: recompute totals on qty change
+// ---------------------------------------------------------------------------
+// Row-level: manual JO No / Item Code entry
+// ---------------------------------------------------------------------------
+
 frappe.ui.form.on("Job Order Corrugator Receipt Item", {
 	qty: recompute_totals,
+
+	// Clear dependent fields so the item_code filter and autofill reapply cleanly
+	job_order_corrugator(frm, cdt, cdn) {
+		frappe.model.set_value(cdt, cdn, "item_code", null);
+		frappe.model.set_value(cdt, cdn, "job_order_corrugator_item", null);
+	},
+
+	// item_code's own fetch_from (item_name, description, quality, flute, width,
+	// length, creasing, uom, basic_rate) fires automatically on manual selection.
+	// Fields sourced from the JO Corrugator Item row itself — not Item master —
+	// still need an explicit fetch here.
+	item_code(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (!row.item_code || !row.job_order_corrugator) return;
+		frappe.call({
+			method:
+				"iib.iib.doctype.job_order_corrugator_receipt.job_order_corrugator_receipt.get_corrugator_item_for_receipt_row",
+			args: { job_order_corrugator: row.job_order_corrugator, item_code: row.item_code },
+			callback(r) {
+				if (!r.message) return;
+				frappe.model.set_value(cdt, cdn, {
+					job_order_corrugator_item: r.message.job_order_corrugator_item,
+					sales_order: r.message.sales_order,
+					due_date: r.message.due_date,
+					delivery_date: r.message.delivery_date,
+					qty: r.message.pending_qty,
+					target_warehouse: r.message.target_warehouse,
+				});
+			},
+		});
+	},
 });
 
 function recompute_totals(frm, cdt, cdn) {

@@ -3,6 +3,10 @@ from erpnext.accounts.utils import get_currency_precision
 from frappe.utils import flt, getdate
 from frappe.model.document import Document
 
+PO_TYPE_GENERAL = "General"
+PO_TYPE_FC = "FC"
+FC_QTY_TOLERANCE = 1e-6
+
 
 class SOBatch(Document):
     def autoname(self):
@@ -18,9 +22,31 @@ class SOBatch(Document):
             frappe.throw("Transaction Date cannot be backdated.")
         if not self.company:
             self.company = frappe.db.get_single_value("Global Defaults", "default_company")
+        self.validate_po_types()
         self.validate_delivery_dates()
         self.set_resolved_items()
         self.set_validated_rates()
+
+    def validate_po_types(self):
+        # PO No is forced to the literal "FC" for FC rows and forbidden as a
+        # General PO No below, so (po_no, po_date, line_no) grouping in
+        # create_sales_orders() can never merge a General and an FC row into
+        # the same Sales Order -- General and FC always land under disjoint
+        # po_no values.
+        for row in self.so_batch_items:
+            po_type = row.po_type or PO_TYPE_GENERAL
+            row.po_type = po_type
+
+            if po_type == PO_TYPE_FC:
+                row.po_no = PO_TYPE_FC
+                row.po_date = self.transaction_date
+            elif po_type == PO_TYPE_GENERAL:
+                if (row.po_no or "").strip().upper() == PO_TYPE_FC:
+                    frappe.throw(
+                        "Row {0}: PO No 'FC' is reserved for Jenis PO = FC".format(row.idx)
+                    )
+            else:
+                frappe.throw("Row {0}: Unknown Jenis PO {1}".format(row.idx, po_type))
 
     def validate_delivery_dates(self):
         for row in self.so_batch_items:
@@ -44,6 +70,9 @@ class SOBatch(Document):
 
     def on_cancel(self):
         self.cancel_related_sales_orders()
+
+    def on_trash(self):
+        self.delete_related_sales_orders()
 
     def set_resolved_items(self):
         for row in self.so_batch_items:
@@ -89,11 +118,14 @@ class SOBatch(Document):
         )
 
         po_groups = {}
+        po_group_types = {}
         for row in self.so_batch_items:
             item_code = row.resolved_set_item_code or row.resolved_item_code
             expected_rate, component_rates = get_expected_rate_for_so_batch_row(row)
             expected_rate = get_sales_order_rate(expected_rate)
+            match_info = resolve_match_info(row)
             key = (row.po_no, row.po_date, row.line_no)
+            po_group_types[key] = row.po_type
             po_groups.setdefault(key, []).append(
                 {
                     "item_code": item_code,
@@ -101,11 +133,13 @@ class SOBatch(Document):
                     "rate": expected_rate,
                     "component_rates": component_rates,
                     "delivery_date": row.delivery_date,
+                    "match_info": match_info,
                 }
             )
 
         created_sos = []
         for (po_no, po_date, line_no), items in po_groups.items():
+            po_type = po_group_types[(po_no, po_date, line_no)]
             so = frappe.new_doc("Sales Order")
             so.company = company
             so.customer = self.customer
@@ -123,6 +157,7 @@ class SOBatch(Document):
             so.po_date = po_date
             so.po_line_no = line_no
             so.so_batch = self.name
+            so.po_type = po_type
 
             for item in items:
                 so.append(
@@ -141,7 +176,8 @@ class SOBatch(Document):
 
             try:
                 so.insert(ignore_permissions=True)
-                apply_validated_rates_to_sales_order(so, items)
+                apply_validated_rates_to_sales_order(so, items, po_type)
+                so.submit()
                 created_sos.append(so.name)
             except Exception:
                 frappe.throw(
@@ -167,7 +203,7 @@ class SOBatch(Document):
             ).insert(ignore_permissions=True)
 
         if created_sos:
-            lines = ["<b>{0} Sales Order(s) created:</b>".format(len(created_sos))]
+            lines = ["<b>{0} Sales Order(s) created and submitted:</b>".format(len(created_sos))]
             for name in created_sos:
                 lines.append("&bull; <a href='/app/sales-order/{0}'>{0}</a>".format(name))
             frappe.msgprint("<br>".join(lines), title="SO Batch Complete", indicator="green")
@@ -178,12 +214,29 @@ class SOBatch(Document):
         sales_orders = frappe.get_all(
             "Sales Order",
             filters={"so_batch": self.name, "docstatus": ["!=", 2]},
-            fields=["name", "docstatus"],
+            fields=["name", "docstatus", "po_type"],
         )
+
+        # Release first: if this same SO Batch contains both an FC row and the
+        # General row that consumed it (mixed Jenis PO in one batch), the
+        # consumption must be undone before the guard below runs -- otherwise
+        # it would wrongly see the FC row as still claimed by a Sales Order
+        # that's being cancelled in this very same operation.
+        for row in sales_orders:
+            release_fc_matches(row.name)
+
+        for row in sales_orders:
+            if row.po_type == PO_TYPE_FC:
+                assert_fc_not_yet_consumed(row.name)
 
         for row in sales_orders:
             sales_order = frappe.get_doc("Sales Order", row.name)
             if sales_order.docstatus == 1:
+                if sales_order.status == "Closed":
+                    # ERPNext refuses to cancel a Closed order outright --
+                    # reopen it first (mirrors the standard "Re-Open" action).
+                    sales_order.update_status("Draft")
+                    sales_order.reload()
                 sales_order.cancel()
             else:
                 frappe.delete_doc(
@@ -197,6 +250,42 @@ class SOBatch(Document):
             frappe.db.delete(
                 "SO Batch Created SO",
                 {"parent": self.name, "parenttype": "SO Batch"},
+            )
+
+    def delete_related_sales_orders(self):
+        """Runs on SO Batch delete (draft or already-cancelled). Frappe's own
+        link check would otherwise deadlock: the Sales Order can't be deleted
+        while it's listed in this batch's Created Sales Orders table, and this
+        batch can't be deleted while a Sales Order still points back via
+        so_batch. Deleting the Sales Orders here first breaks that cycle."""
+        sales_orders = frappe.get_all(
+            "Sales Order",
+            filters={"so_batch": self.name},
+            fields=["name", "docstatus", "po_type"],
+        )
+        if not sales_orders:
+            return
+
+        for row in sales_orders:
+            release_fc_matches(row.name)
+
+        for row in sales_orders:
+            if row.po_type == PO_TYPE_FC:
+                assert_fc_not_yet_consumed(row.name)
+            assert_sales_order_has_no_downstream_documents(row.name)
+
+        for row in sales_orders:
+            sales_order = frappe.get_doc("Sales Order", row.name)
+            if sales_order.docstatus == 1:
+                if sales_order.status == "Closed":
+                    sales_order.update_status("Draft")
+                    sales_order.reload()
+                sales_order.cancel()
+            frappe.delete_doc(
+                "Sales Order",
+                row.name,
+                ignore_permissions=True,
+                force=True,
             )
 
 
@@ -423,12 +512,18 @@ def get_master_card_price_map(master_card, qty, row_idx):
     return price_map, selected_moq
 
 
-def apply_validated_rates_to_sales_order(sales_order, items):
+def apply_validated_rates_to_sales_order(sales_order, items, po_type):
     sales_order.reload()
 
     for index, item in enumerate(items):
         so_item = sales_order.items[index]
         set_sales_order_item_rate(so_item, item["rate"])
+        so_item.custom_po_type = po_type
+
+        master_card, components = item["match_info"]
+        if so_item.item_code in components:
+            so_item.custom_master_card = master_card
+            so_item.custom_component = components[so_item.item_code]
 
         if item["component_rates"]:
             for packed_item in sales_order.packed_items or []:
@@ -441,6 +536,9 @@ def apply_validated_rates_to_sales_order(sales_order, items):
                         )
                     )
                 packed_item.rate = item["component_rates"][packed_item.item_code]
+                packed_item.custom_po_type = po_type
+                packed_item.custom_master_card = master_card
+                packed_item.custom_component = components.get(packed_item.item_code)
 
     sales_order.calculate_taxes_and_totals()
     sales_order.save(ignore_permissions=True)
@@ -454,6 +552,308 @@ def apply_validated_rates_to_sales_order(sales_order, items):
                     sales_order.name, so_item.idx, so_item.rate, item["rate"]
                 )
             )
+
+    if po_type == PO_TYPE_GENERAL:
+        match_fc_quantities(sales_order)
+        # match_fc_quantities writes coverage results via db.set_value, bypassing
+        # this in-memory doc -- reload so a subsequent submit() doesn't overwrite
+        # them with the stale pre-match values.
+        sales_order.reload()
+
+
+def resolve_match_info(row):
+    """Return (master_card, {item_code: component}) describing which Master Card
+    component(s) this SO Batch Item row will produce. Used to match FC (Forecast)
+    quantities against later General PO quantities for the same component."""
+    if row.set_or_pcs == "Set":
+        master_card = get_master_card_for_set_item(row.resolved_set_item_code, row.idx)
+        component_by_item = get_master_card_components_by_item(master_card)
+        bundle_item_codes = frappe.get_all(
+            "Product Bundle Item",
+            filters={"parent": row.resolved_set_item_code},
+            pluck="item_code",
+        )
+        components = {
+            item_code: component_by_item[item_code]
+            for item_code in bundle_item_codes
+            if item_code in component_by_item
+        }
+        return master_card, components
+
+    master_card, component = get_master_card_component_for_item(row.resolved_item_code, row.idx)
+    return master_card, {row.resolved_item_code: component}
+
+
+def match_fc_quantities(sales_order):
+    """For a General Sales Order, consume outstanding FC (Forecast) quantities
+    FIFO by (Master Card, Component), and record on this order how much of it
+    is already covered by prior FC production vs. still needs fresh production."""
+    rows_to_cover = []
+    for so_item in sales_order.items:
+        if so_item.custom_master_card and so_item.custom_component:
+            rows_to_cover.append(("Sales Order Item", so_item))
+    for packed_item in sales_order.packed_items or []:
+        if packed_item.custom_master_card and packed_item.custom_component:
+            rows_to_cover.append(("Packed Item", packed_item))
+
+    touched_fc_sales_orders = set()
+    for doctype, row in rows_to_cover:
+        covered_qty, note, touched = consume_fc_for_row(
+            sales_order.name, row.custom_master_card, row.custom_component, flt(row.qty)
+        )
+        frappe.db.set_value(
+            doctype,
+            row.name,
+            {"custom_fc_covered_qty": covered_qty, "custom_fc_coverage_note": note},
+            update_modified=False,
+        )
+        touched_fc_sales_orders.update(touched)
+
+    for fc_so_name in touched_fc_sales_orders:
+        close_fc_sales_order_if_fully_covered(fc_so_name)
+
+
+def consume_fc_for_row(sales_order_name, master_card, component, qty_needed):
+    fc_rows = get_outstanding_fc_rows(master_card, component)
+
+    remaining = flt(qty_needed)
+    covered = 0.0
+    touched_fc_sales_orders = set()
+    for fc_row in fc_rows:
+        if remaining <= 0:
+            break
+        outstanding = flt(fc_row["qty"]) - flt(fc_row["matched_qty"]) - flt(fc_row["delivered_qty"])
+        if outstanding <= 0:
+            continue
+
+        take = min(outstanding, remaining)
+        frappe.db.set_value(
+            fc_row["doctype"],
+            fc_row["name"],
+            "custom_fc_matched_qty",
+            flt(fc_row["matched_qty"]) + take,
+            update_modified=False,
+        )
+        frappe.get_doc(
+            {
+                "doctype": "FC Match Log",
+                "source_doctype": fc_row["doctype"],
+                "source_name": fc_row["name"],
+                "sales_order": sales_order_name,
+                "master_card": master_card,
+                "component": component,
+                "qty": take,
+            }
+        ).insert(ignore_permissions=True)
+
+        covered += take
+        remaining -= take
+        touched_fc_sales_orders.add(fc_row["sales_order"])
+
+    note = "Clear" if remaining <= 0 else "Ord. {0}".format(format_remark_qty(remaining))
+    return covered, note, touched_fc_sales_orders
+
+
+def format_remark_qty(value):
+    """Format a qty for the Remark text with thousands separators and no
+    trailing decimal noise, e.g. 29200.0 -> "29,200", 1234.5 -> "1,234.5"."""
+    return "{:,.2f}".format(flt(value)).rstrip("0").rstrip(".")
+
+
+def get_outstanding_fc_rows(master_card, component):
+    """FIFO pool of outstanding FC quantity for one (Master Card, Component).
+
+    Ordered by transaction_date first (the business date the user assigned),
+    then by the parent Sales Order's creation timestamp as a tie-breaker --
+    transaction_date is a Date field with no time component, so two FC SOs
+    entered on the same business day would otherwise sort in an arbitrary,
+    non-deterministic order. creation is a full datetime every Frappe
+    document already has, so this needs no schema change.
+    """
+    so_item_rows = frappe.db.sql(
+        """
+        SELECT
+            'Sales Order Item' AS doctype,
+            soi.name AS name,
+            soi.parent AS sales_order,
+            soi.qty AS qty,
+            soi.delivered_qty AS delivered_qty,
+            soi.custom_fc_matched_qty AS matched_qty,
+            so.transaction_date AS transaction_date,
+            so.creation AS so_creation
+        FROM `tabSales Order Item` soi
+        INNER JOIN `tabSales Order` so ON so.name = soi.parent
+        WHERE so.docstatus = 1
+          AND so.po_type = %(fc)s
+          AND soi.custom_master_card = %(master_card)s
+          AND soi.custom_component = %(component)s
+        """,
+        {"fc": PO_TYPE_FC, "master_card": master_card, "component": component},
+        as_dict=True,
+    )
+
+    packed_item_rows = frappe.db.sql(
+        """
+        SELECT
+            'Packed Item' AS doctype,
+            pi.name AS name,
+            pi.parent AS sales_order,
+            pi.qty AS qty,
+            pi.packed_qty AS delivered_qty,
+            pi.custom_fc_matched_qty AS matched_qty,
+            so.transaction_date AS transaction_date,
+            so.creation AS so_creation
+        FROM `tabPacked Item` pi
+        INNER JOIN `tabSales Order` so ON so.name = pi.parent
+        WHERE so.docstatus = 1
+          AND pi.parenttype = 'Sales Order'
+          AND so.po_type = %(fc)s
+          AND pi.custom_master_card = %(master_card)s
+          AND pi.custom_component = %(component)s
+        """,
+        {"fc": PO_TYPE_FC, "master_card": master_card, "component": component},
+        as_dict=True,
+    )
+
+    rows = list(so_item_rows) + list(packed_item_rows)
+    rows.sort(key=lambda r: (getdate(r["transaction_date"]), r["so_creation"]))
+    return rows
+
+
+def close_fc_sales_order_if_fully_covered(sales_order_name):
+    """Close an FC Sales Order once every item on it has been fully claimed by
+    later General PO(s) -- there's nothing left on it still waiting on a
+    customer PO, so it shouldn't sit open in To Deliver/To Bill lists."""
+    so = frappe.get_doc("Sales Order", sales_order_name)
+    if so.docstatus != 1 or so.po_type != PO_TYPE_FC or so.status in ("Closed", "Cancelled"):
+        return
+    if not so.items:
+        return
+
+    if all(is_so_item_fully_covered(so, item) for item in so.items):
+        so.update_status("Closed")
+
+
+def is_so_item_fully_covered(so, so_item):
+    if so_item.custom_master_card and so_item.custom_component:
+        return flt(so_item.qty) - flt(so_item.custom_fc_matched_qty) <= FC_QTY_TOLERANCE
+
+    packed_rows = [
+        p for p in (so.packed_items or []) if p.parent_detail_docname == so_item.name
+    ]
+    if not packed_rows:
+        return False
+
+    return all(
+        flt(p.qty) - flt(p.custom_fc_matched_qty) <= FC_QTY_TOLERANCE for p in packed_rows
+    )
+
+
+def release_fc_matches(sales_order_name):
+    """Undo any FC quantity this Sales Order consumed, e.g. when the SO Batch
+    that created it is cancelled. Safe to call even if nothing was consumed."""
+    logs = frappe.get_all(
+        "FC Match Log",
+        filters={"sales_order": sales_order_name},
+        fields=["name", "source_doctype", "source_name", "qty"],
+    )
+    touched_fc_sales_orders = set()
+    for log in logs:
+        current = flt(
+            frappe.db.get_value(log.source_doctype, log.source_name, "custom_fc_matched_qty")
+        )
+        frappe.db.set_value(
+            log.source_doctype,
+            log.source_name,
+            "custom_fc_matched_qty",
+            max(current - flt(log.qty), 0),
+            update_modified=False,
+        )
+        touched_fc_sales_orders.add(
+            frappe.db.get_value(log.source_doctype, log.source_name, "parent")
+        )
+        frappe.delete_doc("FC Match Log", log.name, ignore_permissions=True, force=True)
+
+    for fc_so_name in touched_fc_sales_orders:
+        reopen_fc_sales_order_if_no_longer_covered(fc_so_name)
+
+
+def reopen_fc_sales_order_if_no_longer_covered(sales_order_name):
+    """Mirror of close_fc_sales_order_if_fully_covered: if releasing a
+    consumed quantity leaves a Closed FC Sales Order no longer fully
+    covered, reopen it so it doesn't sit misleadingly Closed."""
+    so = frappe.get_doc("Sales Order", sales_order_name)
+    if so.docstatus != 1 or so.status != "Closed":
+        return
+    if not all(is_so_item_fully_covered(so, item) for item in so.items):
+        so.update_status("Draft")
+
+
+def assert_fc_not_yet_consumed(sales_order_name):
+    """Block cancelling an FC Sales Order once a later General PO has already
+    claimed some of its quantity — that General order's coverage would go stale."""
+    consumed = frappe.db.sql(
+        """
+        SELECT COUNT(*) FROM `tabSales Order Item`
+        WHERE parent = %s AND IFNULL(custom_fc_matched_qty, 0) > 0
+        UNION ALL
+        SELECT COUNT(*) FROM `tabPacked Item`
+        WHERE parent = %s AND parenttype = 'Sales Order' AND IFNULL(custom_fc_matched_qty, 0) > 0
+        """,
+        (sales_order_name, sales_order_name),
+    )
+    if any(r[0] for r in consumed):
+        frappe.throw(
+            "Sales Order {0} (FC) already has quantity claimed by a later PO. "
+            "Cancel or amend those Sales Orders first.".format(sales_order_name)
+        )
+
+
+def assert_sales_order_has_no_downstream_documents(sales_order_name):
+    """Force-deleting a Sales Order (via SO Batch delete) skips Frappe's normal
+    linked-document check. Re-check the doctypes that actually matter here so
+    a Delivery Note, Sales Invoice, or Job Order doesn't end up pointing at a
+    Sales Order that no longer exists."""
+    checks = [
+        ("Delivery Note Item", "against_sales_order"),
+        ("Sales Invoice Item", "sales_order"),
+        ("Job Order Corrugator Item", "sales_order"),
+        ("Job Order Converting Sales Order Item", "sales_order"),
+    ]
+    blockers = []
+    for doctype, fieldname in checks:
+        count = frappe.db.count(doctype, {fieldname: sales_order_name})
+        if count:
+            blockers.append("{0} {1} row(s)".format(count, doctype))
+
+    if blockers:
+        frappe.throw(
+            "Cannot delete Sales Order {0}: still referenced by {1}. "
+            "Remove those first.".format(sales_order_name, ", ".join(blockers))
+        )
+
+
+def block_fc_sales_orders(doc, method=None):
+    """Doc event: block Delivery Note / Sales Invoice items that reference a
+    Sales Order still marked Jenis PO = FC — those need a confirmed customer
+    PO Number before they can be delivered or invoiced."""
+    so_fieldname = "against_sales_order" if doc.doctype == "Delivery Note" else "sales_order"
+    so_names = {row.get(so_fieldname) for row in doc.items if row.get(so_fieldname)}
+    if not so_names:
+        return
+
+    fc_sales_orders = frappe.get_all(
+        "Sales Order",
+        filters={"name": ["in", list(so_names)], "po_type": PO_TYPE_FC},
+        pluck="name",
+    )
+    if fc_sales_orders:
+        frappe.throw(
+            "Cannot proceed: Sales Order {0} is still Jenis PO = FC. "
+            "Wait for the customer's PO Number before creating a Delivery Note / Sales Invoice.".format(
+                ", ".join(fc_sales_orders)
+            )
+        )
 
 
 def set_sales_order_item_rate(so_item, rate):

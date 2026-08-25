@@ -11,6 +11,11 @@
   "item_code",
   "item_name",
   "description",
+  "quality",
+  "flute",
+  "width",
+  "length",
+  "creasing",
   "sales_order",
   "due_date",
   "delivery_date",
@@ -28,7 +33,6 @@
    "in_list_view": 1,
    "label": "JO No",
    "options": "Job Order Corrugator",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -44,7 +48,6 @@
    "in_list_view": 1,
    "label": "Item Code",
    "options": "Item",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -60,6 +63,43 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_board_quality",
+   "fieldname": "quality",
+   "fieldtype": "Link",
+   "label": "Quality",
+   "options": "Board Quality",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_flute",
+   "fieldname": "flute",
+   "fieldtype": "Link",
+   "label": "Flute",
+   "options": "Flute",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_width",
+   "fieldname": "width",
+   "fieldtype": "Int",
+   "label": "Width",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_length",
+   "fieldname": "length",
+   "fieldtype": "Int",
+   "label": "Length",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_crease_w",
+   "fieldname": "creasing",
+   "fieldtype": "Data",
+   "label": "Creasing",
    "read_only": 1
   },
   {

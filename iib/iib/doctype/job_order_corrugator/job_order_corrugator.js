@@ -251,7 +251,7 @@ function open_so_picker_dialog(frm) {
 		).trim().toLowerCase();
 
 		displayed_rows = all_rows.filter((r) => {
-			if (open_only && (r.corrugator_qty || 0) >= (r.qty || 0)) return false;
+			if (open_only && (r.corrugator_qty || 0) >= (r.available_qty || 0)) return false;
 			if (item_filter && !r.item_code.toLowerCase().includes(item_filter)) return false;
 			return true;
 		});
@@ -319,11 +319,13 @@ function open_so_picker_dialog(frm) {
 							</th>
 							<th style="padding: 6px;">${__("Sales Order")}</th>
 							<th style="padding: 6px;">${__("SO Date")}</th>
+							<th style="padding: 6px;">${__("PO No")}</th>
 							<th style="padding: 6px;">${__("Delivery Date")}</th>
 							<th style="padding: 6px;">${__("Item Code")}</th>
-							<th style="padding: 6px;">${__("Item Name")}</th>
-							<th style="padding: 6px; text-align: right;">${__("Qty")}</th>
+							<th style="padding: 6px; text-align: right;">${__("Order Qty")}</th>
+							<th style="padding: 6px; text-align: right;">${__("Closed Qty")}</th>
 							<th style="width: 72px; padding: 6px; text-align: right;">${__("Cor Qty")}</th>
+							<th style="padding: 6px;">${__("Remark")}</th>
 						</tr>
 					</thead>
 					<tbody>`;
@@ -341,13 +343,15 @@ function open_so_picker_dialog(frm) {
 					</td>
 					<td style="padding: 6px;">${frappe.utils.escape_html(row.sales_order)}</td>
 					<td style="padding: 6px;">${frappe.utils.escape_html(so_date)}</td>
+					<td style="padding: 6px;">${frappe.utils.escape_html(row.po_no || "")}</td>
 					<td style="padding: 6px;">${frappe.utils.escape_html(delivery)}</td>
 					<td style="padding: 6px;">${frappe.utils.escape_html(row.item_code)}</td>
-					<td style="padding: 6px;">${frappe.utils.escape_html(row.item_name || "")}</td>
-					<td style="padding: 6px; text-align: right;">${frappe.format(row.qty, { fieldtype: "Float" })}</td>
+					<td style="padding: 6px; text-align: right; color: var(--text-muted);">${frappe.format(row.qty, { fieldtype: "Float" })}</td>
+					<td style="padding: 6px; text-align: right;">${frappe.format(row.closed_qty, { fieldtype: "Float" })}</td>
 					<td style="width: 72px; padding: 6px; text-align: right; color: ${corr > 0 ? "var(--text-muted)" : "inherit"};">
 						${frappe.format(corr, { fieldtype: "Float" })}
 					</td>
+					<td style="padding: 6px; color: var(--text-muted);">${frappe.utils.escape_html(row.remark || "")}</td>
 				</tr>`;
 		});
 
@@ -447,7 +451,7 @@ function open_so_picker_dialog(frm) {
 				new_row.sales_order_item = dialog_row.sales_order_item;
 				new_row.item_name = dialog_row.item_name || "";
 				new_row.uom = dialog_row.uom || "Nos";
-				new_row.qty = dialog_row.qty || 0;
+				new_row.qty = dialog_row.available_qty || 0;
 				new_row.delivery_date = dialog_row.delivery_date || null;
 				new_row.so_date = dialog_row.so_date || null;
 				new_row.customer = dialog_row.customer || "";

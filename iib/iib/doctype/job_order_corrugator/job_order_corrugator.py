@@ -249,7 +249,7 @@ class JobOrderCorrugator(Document):
 			so_data = frappe.db.get_value(
 				"Sales Order Item",
 				so_item_name,
-				["qty", "item_code", "custom_corrugator_qty"],
+				["parent", "qty", "item_code", "custom_corrugator_qty", "custom_fc_matched_qty"],
 				as_dict=True,
 			)
 			if not so_data:
@@ -258,15 +258,13 @@ class JobOrderCorrugator(Document):
 			is_bundle = frappe.db.exists("Product Bundle", so_data.item_code)
 
 			if is_bundle:
-				# Reference qty = SO set qty × packed-component qty-per-set
-				packed_qty_per_set = frappe.db.get_value(
-					"Product Bundle Item",
-					{"parent": so_data.item_code, "item_code": item_code},
-					"qty",
-				)
-				if not packed_qty_per_set:
+				# Reference qty comes straight from the Packed Item record backing
+				# this component -- the same record consume_fc_for_row() writes
+				# custom_fc_matched_qty onto for bundle FC rows.
+				packed_row = get_packed_item_fc_row(so_data.parent, so_item_name, item_code)
+				if not packed_row:
 					continue  # Component not in bundle definition — skip
-				so_qty = flt(so_data.qty) * flt(packed_qty_per_set)
+				so_qty = compute_available_qty(packed_row.qty, packed_row.custom_fc_matched_qty)
 				# Previously submitted JO P1 qty for this specific component + SO item
 				# (excluding the current document so resubmit / amend works correctly)
 				prev_corrugator_qty = flt(
@@ -284,7 +282,7 @@ class JobOrderCorrugator(Document):
 					)[0][0]
 				)
 			else:
-				so_qty = flt(so_data.qty)
+				so_qty = compute_available_qty(so_data.qty, so_data.custom_fc_matched_qty)
 				prev_corrugator_qty = flt(so_data.custom_corrugator_qty or 0)
 
 			total_qty = prev_corrugator_qty + current_qty
@@ -596,6 +594,34 @@ def get_items_from_so_for_corrugator(source_name, target_doc=None, kwargs=None):
 	return target_doc
 
 
+def compute_available_qty(qty, fc_matched_qty):
+	"""Qty Avail = Qty − Qty FC Matched, never negative.
+
+	Qty FC Matched (custom_fc_matched_qty) is only ever written onto the FC
+	Sales Order Item/Packed Item that a later General PO claimed quantity
+	from -- it is always 0/null on General rows and on rows untouched by FC
+	matching, so this subtraction is a safe no-op for those.
+	"""
+	return max(0.0, flt(qty) - flt(fc_matched_qty or 0))
+
+
+def get_packed_item_fc_row(sales_order, sales_order_item, item_code):
+	"""Fetch qty + Qty JO Cor + Qty FC Matched + Remark for the Packed Item
+	backing one bundle component -- the same lookup used by both the picker
+	dialog and the tolerance validator for bundle SO rows."""
+	return frappe.db.get_value(
+		"Packed Item",
+		{
+			"parent": sales_order,
+			"parent_detail_docname": sales_order_item,
+			"item_code": item_code,
+			"parenttype": "Sales Order",
+		},
+		["qty", "custom_corrugator_qty", "custom_fc_matched_qty", "custom_fc_coverage_note"],
+		as_dict=True,
+	)
+
+
 @frappe.whitelist()
 def get_so_items_for_corrugator_dialog(sales_orders):
 	"""Return available SO items for the custom two-step JO P1 picker dialog.
@@ -605,6 +631,16 @@ def get_so_items_for_corrugator_dialog(sales_orders):
 	will land in the JO P1.  ``corrugator_qty`` is read from ``Packed Item`` for
 	bundle components (where tracking lives) and from ``Sales Order Item`` for plain
 	items.
+
+	Each row carries ``qty`` (the row's raw ordered qty, display only),
+	``closed_qty`` (``custom_fc_matched_qty`` -- how much of this qty has
+	already been claimed by a later General PO, display only), and
+	``available_qty`` (``qty`` minus ``closed_qty`` -- see
+	``compute_available_qty``) -- callers should use ``available_qty`` when
+	selecting/copying qty into a JO P1, never ``qty`` or ``closed_qty``
+	directly. Rows fully claimed away (``available_qty <= 0``) are omitted
+	entirely. ``remark`` carries the FC coverage note ("Clear" / "Ord. X")
+	when present.
 
 	Returns a flat list of dicts, one per item row to display.
 	"""
@@ -621,6 +657,7 @@ def get_so_items_for_corrugator_dialog(sales_orders):
 
 		customer = so.customer
 		so_date = str(so.transaction_date) if so.transaction_date else ""
+		po_no = so.po_no or ""
 
 		for so_item in so.items:
 			packed_items = frappe.get_all(
@@ -632,8 +669,8 @@ def get_so_items_for_corrugator_dialog(sales_orders):
 
 			if packed_items:
 				# Bundle → one result row per packed component.
-				# Corrugator qty is tracked per component on Packed Item, not on the
-				# bundle parent SO Item row.
+				# Corrugator qty and FC-matched qty are tracked per component on
+				# Packed Item, not on the bundle parent SO Item row.
 				for packed_item in packed_items:
 					item_meta = (
 						frappe.db.get_value(
@@ -644,45 +681,56 @@ def get_so_items_for_corrugator_dialog(sales_orders):
 						)
 						or {}
 					)
-					component_corrugator_qty = flt(
-						frappe.db.get_value(
-							"Packed Item",
-							{
-								"parent": so_name,
-								"parent_detail_docname": so_item.name,
-								"item_code": packed_item["item_code"],
-							},
-							"custom_corrugator_qty",
-						)
-						or 0
+					packed_row = get_packed_item_fc_row(
+						so_name, so_item.name, packed_item["item_code"]
 					)
+					component_qty = flt(so_item.qty) * flt(packed_item["qty_per_bundle"])
+					component_corrugator_qty = flt(
+						(packed_row and packed_row.custom_corrugator_qty) or 0
+					)
+					closed_qty = flt((packed_row and packed_row.custom_fc_matched_qty) or 0)
+					available_qty = compute_available_qty(component_qty, closed_qty)
+					if available_qty <= 0:
+						continue  # FC row fully claimed by later General PO(s)
 					result.append(
 						{
 							"sales_order": so_name,
 							"so_date": so_date,
+							"po_no": po_no,
 							"sales_order_item": so_item.name,
 							"item_code": packed_item["item_code"],
 							"item_name": item_meta.get("item_name") or packed_item["item_code"],
 							"description": packed_item.get("description") or "",
 							"uom": item_meta.get("stock_uom") or "Nos",
-							"qty": flt(so_item.qty) * flt(packed_item["qty_per_bundle"]),
+							"qty": component_qty,
+							"available_qty": available_qty,
+							"closed_qty": closed_qty,
 							"corrugator_qty": component_corrugator_qty,
+							"remark": (packed_row and packed_row.custom_fc_coverage_note) or "",
 							"delivery_date": str(so_item.delivery_date) if so_item.delivery_date else "",
 							"customer": customer,
 						}
 					)
 			else:
+				closed_qty = flt(so_item.get("custom_fc_matched_qty") or 0)
+				available_qty = compute_available_qty(so_item.qty, closed_qty)
+				if available_qty <= 0:
+					continue  # FC row fully claimed by later General PO(s)
 				result.append(
 					{
 						"sales_order": so_name,
 						"so_date": so_date,
+						"po_no": po_no,
 						"sales_order_item": so_item.name,
 						"item_code": so_item.item_code,
 						"item_name": so_item.item_name or so_item.item_code,
 						"description": so_item.description or "",
 						"uom": so_item.uom,
 						"qty": flt(so_item.qty),
+						"available_qty": available_qty,
+						"closed_qty": closed_qty,
 						"corrugator_qty": flt(so_item.get("custom_corrugator_qty") or 0),
+						"remark": so_item.get("custom_fc_coverage_note") or "",
 						"delivery_date": str(so_item.delivery_date) if so_item.delivery_date else "",
 						"customer": customer,
 					}

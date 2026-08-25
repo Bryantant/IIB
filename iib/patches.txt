@@ -21,3 +21,4 @@ iib.patches.v0_0.create_iib_feature_control_defaults
 iib.patches.v1_0.rename_corrugator_item_required_date_to_due_date
 iib.patches.v1_0.remove_user_mandatory_profile_property_setters
 iib.patches.v1_0.fix_master_card_item_description_text
+iib.patches.v1_0.add_po_type_fields

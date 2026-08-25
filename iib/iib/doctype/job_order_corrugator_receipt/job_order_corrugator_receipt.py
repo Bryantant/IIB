@@ -5,7 +5,7 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate, nowtime
+from frappe.utils import flt, getdate
 
 from iib.iib.doctype.job_order_corrugator.job_order_corrugator import JOP1_TARGET_WAREHOUSE
 from iib.iib.utils.tolerance import lookup_tolerance
@@ -23,6 +23,10 @@ class JobOrderCorrugatorReceipt(StockController):
 		self.name = f"IBJOP1{yy}{seq}"
 
 	def validate(self):
+		# Inherited from TransactionBase (via StockController -> AccountsController):
+		# forces posting_date/posting_time to now() unless "Edit Posting Date and
+		# Time" is checked -- same enforcement Sales Invoice/Delivery Note use.
+		self.validate_posting_time()
 		self.set_defaults()
 		self.validate_expense_account()
 		self.validate_items()
@@ -32,8 +36,6 @@ class JobOrderCorrugatorReceipt(StockController):
 			self.status = "Draft"
 
 	def set_defaults(self):
-		if not self.posting_time:
-			self.posting_time = nowtime()
 		# Header GL defaults — sourced from IIB Settings
 		if not self.cost_center:
 			self.cost_center = frappe.db.get_single_value(
@@ -398,6 +400,11 @@ def get_corrugator_items_for_receipt_dialog(job_order_corrugators, filtered_chil
 			"item_code",
 			"item_name",
 			"description",
+			"quality",
+			"flute",
+			"width",
+			"length",
+			"crease_w",
 			"sales_order",
 			"uom",
 			"qty",
@@ -455,3 +462,73 @@ def get_corrugator_items(job_order_corrugators):
 		r["target_warehouse"] = JOP1_TARGET_WAREHOUSE
 		output.append(r)
 	return output
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_corrugator_component_items(doctype, txt, searchfield, start, page_len, filters):
+	"""Custom item_code search for manually-added Receipt Item rows.
+
+	Returns Component stock items that still have pending qty on the selected
+	Job Order Corrugator. Returns nothing when no JO Corrugator is selected yet
+	on that row — Item Code should not be pickable before JO No is set.
+	"""
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+	job_order_corrugator = (filters or {}).get("job_order_corrugator")
+
+	if not job_order_corrugator:
+		return []
+
+	pending_items = frappe.get_all(
+		"Job Order Corrugator Item",
+		filters={"parent": job_order_corrugator},
+		fields=["item_code", "qty", "received_qty"],
+	)
+	allowed = {d.item_code for d in pending_items if flt(d.qty) > flt(d.received_qty)}
+	if not allowed:
+		return []
+
+	return frappe.db.sql(
+		"""
+		SELECT name, item_name
+		FROM `tabItem`
+		WHERE name IN %(allowed)s
+		  AND is_stock_item = 1
+		  AND item_group = 'Component'
+		  AND (name LIKE %(txt)s OR item_name LIKE %(txt)s)
+		ORDER BY name
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{"allowed": list(allowed), "txt": f"%{txt}%", "start": start, "page_len": page_len},
+	)
+
+
+@frappe.whitelist()
+def get_corrugator_item_for_receipt_row(job_order_corrugator, item_code):
+	"""Return JO Corrugator Item row details to auto-fill a manually-picked Receipt Item row.
+
+	item_name/description/quality/flute/width/length/creasing/uom/basic_rate are already
+	handled by fetch_from on item_code and don't need to be returned here. This only covers
+	fields sourced from the Job Order Corrugator Item row itself: the row link used for
+	validation/tolerance tracking, provenance (sales_order/due_date/delivery_date), and a
+	sensible default qty (the row's pending qty).
+	"""
+	rows = frappe.get_all(
+		"Job Order Corrugator Item",
+		filters={"parent": job_order_corrugator, "item_code": item_code},
+		fields=["name", "sales_order", "due_date", "delivery_date", "qty", "received_qty"],
+		order_by="idx",
+	)
+	if not rows:
+		return None
+
+	row = next((r for r in rows if flt(r.qty) > flt(r.received_qty)), rows[0])
+	return {
+		"job_order_corrugator_item": row.name,
+		"sales_order": row.sales_order,
+		"due_date": row.due_date,
+		"delivery_date": row.delivery_date,
+		"pending_qty": flt(row.qty) - flt(row.received_qty),
+		"target_warehouse": JOP1_TARGET_WAREHOUSE,
+	}
