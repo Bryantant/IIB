@@ -87,7 +87,10 @@ class TestSOBatch(FrappeTestCase):
             frappe._dict({"moq_idx": 3, "component": "A", "total": 2.3456}),
         ]
 
-        with patch("frappe.get_all", side_effect=[moq_rows, price_item_rows]):
+        with patch("frappe.get_all", side_effect=[moq_rows, price_item_rows]), patch(
+            "iib.iib.doctype.so_batch.so_batch.get_price_matrix_precision",
+            return_value=4,
+        ):
             price_map, moq_qty = get_master_card_price_map("MC-TEST", 75, 1)
 
         self.assertEqual(moq_qty, 50)
